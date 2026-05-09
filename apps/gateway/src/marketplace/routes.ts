@@ -1,0 +1,132 @@
+import type { FastifyInstance, FastifyRequest, FastifyReply } from "fastify";
+import { prisma } from "@modelmesh/db";
+import { authMiddleware, requirePermission, AuthenticatedRequest } from "../auth/middleware.js";
+
+export async function registerMarketplaceRoutes(fastify: FastifyInstance) {
+  fastify.addHook("onRequest", authMiddleware);
+
+  // List marketplace presets
+  fastify.get("/v1/marketplace", async (request: AuthenticatedRequest, reply: FastifyReply) => {
+    const query = request.query as Record<string, string>;
+    const category = query.category;
+    const search = query.search;
+
+    const presets = await prisma.marketplacePreset.findMany({
+      where: {
+        enabled: true,
+        ...(category ? { category } : {}),
+        ...(search
+          ? {
+              OR: [
+                { name: { contains: search, mode: "insensitive" } },
+                { description: { contains: search, mode: "insensitive" } },
+                { tags: { has: search } },
+              ],
+            }
+          : {}),
+      },
+      orderBy: { downloads: "desc" },
+    });
+
+    return reply.send({
+      data: presets.map((p) => ({
+        id: p.id,
+        name: p.name,
+        description: p.description,
+        category: p.category,
+        providerName: p.providerName,
+        modelId: p.modelId,
+        capabilities: p.capabilities,
+        contextWindow: p.contextWindow,
+        pricingPrompt: p.pricingPrompt,
+        pricingCompletion: p.pricingCompletion,
+        tags: p.tags,
+        downloads: p.downloads,
+        rating: p.rating,
+        config: p.config,
+      })),
+    });
+  });
+
+  // Get single preset
+  fastify.get("/v1/marketplace/:id", async (_request, reply: FastifyReply) => {
+    const { id } = _request.params as Record<string, string>;
+    const preset = await prisma.marketplacePreset.findUnique({ where: { id } });
+    if (!preset) return reply.status(404).send({ error: { message: "Preset not found", type: "not_found" } });
+    return reply.send(preset);
+  });
+
+  // Install preset (self-hosted: creates a local provider + model)
+  fastify.post("/v1/marketplace/:id/install", { preHandler: requirePermission("marketplace:write") }, async (request: AuthenticatedRequest, reply: FastifyReply) => {
+    const { id } = request.params as Record<string, string>;
+    const preset = await prisma.marketplacePreset.findUnique({ where: { id } });
+    if (!preset) return reply.status(404).send({ error: { message: "Preset not found", type: "not_found" } });
+
+    const existingProvider = await prisma.provider.findUnique({ where: { name: preset.providerName } });
+    if (existingProvider) {
+      return reply.status(409).send({ error: { message: `Provider ${preset.providerName} already exists`, type: "conflict" } });
+    }
+
+    const provider = await prisma.provider.create({
+      data: {
+        name: preset.providerName,
+        displayName: preset.providerName,
+        baseUrl: null,
+        apiKey: null,
+        enabled: true,
+        models: {
+          create: {
+            externalId: preset.modelId,
+            name: preset.name,
+            contextWindow: preset.contextWindow,
+            capabilities: preset.capabilities,
+            supportsStreaming: preset.capabilities.includes("streaming"),
+            supportsToolUse: preset.capabilities.includes("tool_use") || preset.capabilities.includes("function_calling"),
+            promptPricePer1k: preset.pricingPrompt,
+            completionPricePer1k: preset.pricingCompletion,
+          },
+        },
+      },
+    });
+
+    await prisma.marketplacePreset.update({
+      where: { id },
+      data: { downloads: { increment: 1 } },
+    });
+
+    return reply.status(201).send({
+      providerId: provider.id,
+      modelId: provider.models[0]?.id,
+      message: `Installed ${preset.name} as ${preset.providerName}/${preset.modelId}`,
+    });
+  });
+
+  // Create marketplace preset (admin only)
+  fastify.post("/v1/marketplace", { preHandler: requirePermission("marketplace:write") }, async (request: AuthenticatedRequest, reply: FastifyReply) => {
+    const body = request.body as Record<string, unknown>;
+    const preset = await prisma.marketplacePreset.create({
+      data: {
+        name: String(body.name ?? ""),
+        description: body.description ? String(body.description) : null,
+        category: String(body.category ?? "general"),
+        providerName: String(body.providerName ?? ""),
+        modelId: String(body.modelId ?? ""),
+        capabilities: Array.isArray(body.capabilities) ? body.capabilities as string[] : [],
+        contextWindow: Number(body.contextWindow ?? 4096),
+        pricingPrompt: Number(body.pricingPrompt ?? 0),
+        pricingCompletion: Number(body.pricingCompletion ?? 0),
+        config: body.config && typeof body.config === "object" ? body.config : {},
+        tags: Array.isArray(body.tags) ? body.tags as string[] : [],
+      },
+    });
+
+    return reply.status(201).send(preset);
+  });
+
+  // Delete preset
+  fastify.delete("/v1/marketplace/:id", { preHandler: requirePermission("marketplace:write") }, async (request: AuthenticatedRequest, reply: FastifyReply) => {
+    const { id } = request.params as Record<string, string>;
+    await prisma.marketplacePreset.delete({ where: { id } });
+    return reply.status(204).send();
+  });
+}

@@ -1,0 +1,442 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Provider {
+  id          String   @id @default(cuid())
+  name        String   @unique
+  displayName String
+  enabled     Boolean  @default(true)
+  baseUrl     String?
+  apiKey      String?
+  timeoutMs   Int      @default(30000)
+  retries     Int      @default(3)
+  weight      Int      @default(1)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  models      Model[]
+  usageLogs   UsageLog[]
+  healthLogs  HealthLog[]
+  teamProviders TeamProvider[]
+  agents      Agent[]
+
+  @@map("providers")
+}
+
+model Model {
+  id            String   @id @default(cuid())
+  providerId    String
+  externalId    String
+  name          String
+  contextWindow Int
+  maxTokens     Int?
+  capabilities  String[]
+  supportsStreaming Boolean @default(true)
+  supportsToolUse   Boolean @default(false)
+  promptPricePer1k  Float  @default(0)
+  completionPricePer1k Float @default(0)
+  currency      String   @default("USD")
+  latencyTtftMs Int      @default(500)
+  latencyThroughputTokensPerSec Int @default(50)
+  latencyScore  Int      @default(50)
+  enabled       Boolean  @default(true)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  provider      Provider @relation(fields: [providerId], references: [id], onDelete: Cascade)
+  usageLogs     UsageLog[]
+
+  @@unique([providerId, externalId])
+  @@map("models")
+}
+
+model RoutingRule {
+  id          String   @id @default(cuid())
+  name        String
+  priority    Int      @default(0)
+  enabled     Boolean  @default(true)
+  condition   Json
+  action      Json
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@map("routing_rules")
+}
+
+model ApiKey {
+  id          String   @id @default(cuid())
+  name        String
+  keyHash     String   @unique
+  keyPrefix   String
+  scopes      String[]
+  rateLimitRpm Int?
+  rateLimitTpm Int?
+  expiresAt   DateTime?
+  lastUsedAt  DateTime?
+  usageCount  Int      @default(0)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@map("api_keys")
+}
+
+model UsageLog {
+  id                String   @id @default(cuid())
+  requestId         String   @unique
+  timestamp         DateTime @default(now())
+  providerId        String
+  modelId           String
+  taskType          String
+  promptTokens      Int      @default(0)
+  completionTokens  Int      @default(0)
+  totalTokens       Int      @default(0)
+  cost              Float    @default(0)
+  latencyMs         Int      @default(0)
+  userId            String?
+  teamId            String?
+  status            String   @default("success")
+  errorMessage      String?
+  routingReason     String?
+  score             Float?
+
+  provider          Provider @relation(fields: [providerId], references: [id], onDelete: Cascade)
+  model             Model    @relation(fields: [modelId], references: [id], onDelete: Cascade)
+
+  @@index([timestamp])
+  @@index([providerId, timestamp])
+  @@index([userId, timestamp])
+  @@index([teamId, timestamp])
+  @@map("usage_logs")
+}
+
+model HealthLog {
+  id                String   @id @default(cuid())
+  providerId        String
+  status            String   @default("unknown")
+  latencyMs         Int      @default(0)
+  errorRate         Float    @default(0)
+  successRate       Float    @default(0)
+  consecutiveFailures Int    @default(0)
+  checkedAt         DateTime @default(now())
+
+  provider          Provider @relation(fields: [providerId], references: [id], onDelete: Cascade)
+
+  @@index([providerId, checkedAt])
+  @@map("health_logs")
+}
+
+model Budget {
+  id            String   @id @default(cuid())
+  name          String
+  userId        String?
+  teamId        String?
+  limit         Float
+  currentSpend    Float    @default(0)
+  alertThreshold  Float    @default(0.8)
+  period        String   @default("monthly")
+  resetDate     DateTime?
+  alerted       Boolean  @default(false)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  @@map("budgets")
+}
+
+model Setting {
+  id    String @id @default(cuid())
+  key   String @unique
+  value Json
+
+  @@map("settings")
+}
+
+model User {
+  id          String   @id @default(cuid())
+  email       String   @unique
+  name        String?
+  avatar      String?
+  authProvider String  @default("local") // local, github, google, oidc
+  authId      String?
+  role        String   @default("user")   // super_admin, admin, user
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  teams       TeamMember[]
+  auditLogs   AuditLog[]
+  sessions    UserSession[]
+
+  @@map("users")
+}
+
+model UserSession {
+  id        String   @id @default(cuid())
+  userId    String
+  token     String   @unique
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("user_sessions")
+}
+
+model Team {
+  id          String   @id @default(cuid())
+  name        String
+  slug        String   @unique
+  description String?
+  enabled     Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  members     TeamMember[]
+  providers   TeamProvider[]
+  budgets     Budget[]
+  usageLogs   UsageLog[]
+  invitations TeamInvitation[]
+
+  @@map("teams")
+}
+
+model TeamMember {
+  id          String   @id @default(cuid())
+  teamId      String
+  userId      String
+  role        String   @default("developer") // owner, admin, developer, viewer
+  permissions String[] @default([])
+  joinedAt    DateTime @default(now())
+
+  team        Team     @relation(fields: [teamId], references: [id], onDelete: Cascade)
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([teamId, userId])
+  @@map("team_members")
+}
+
+model TeamInvitation {
+  id        String   @id @default(cuid())
+  teamId    String
+  email     String
+  role      String   @default("developer")
+  token     String   @unique
+  expiresAt DateTime
+  accepted  Boolean  @default(false)
+  createdAt DateTime @default(now())
+
+  team      Team     @relation(fields: [teamId], references: [id], onDelete: Cascade)
+
+  @@map("team_invitations")
+}
+
+model TeamProvider {
+  id          String   @id @default(cuid())
+  teamId      String
+  providerId  String
+  enabled     Boolean  @default(true)
+  customBaseUrl String?
+  customApiKey  String?
+  weight      Int      @default(1)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  team        Team     @relation(fields: [teamId], references: [id], onDelete: Cascade)
+  provider    Provider @relation(fields: [providerId], references: [id], onDelete: Cascade)
+
+  @@unique([teamId, providerId])
+  @@map("team_providers")
+}
+
+model AuditLog {
+  id          String   @id @default(cuid())
+  userId      String?
+  teamId      String?
+  action      String   // request, provider_change, rule_change, key_create, etc.
+  resource    String   // api, provider, rule, key, agent, workflow
+  resourceId  String?
+  details     Json?
+  ipAddress   String?
+  userAgent   String?
+  timestamp   DateTime @default(now())
+
+  @@index([timestamp])
+  @@index([userId, timestamp])
+  @@index([teamId, timestamp])
+  @@index([action, timestamp])
+  @@map("audit_logs")
+}
+
+model MarketplacePreset {
+  id            String   @id @default(cuid())
+  name          String
+  description   String?
+  category      String   @default("general") // coding, reasoning, vision, local, etc.
+  providerName  String
+  modelId       String
+  capabilities  String[]
+  contextWindow Int
+  pricingPrompt Float    @default(0)
+  pricingCompletion Float @default(0)
+  config        Json?    // Extra provider-specific config
+  tags          String[]
+  downloads     Int      @default(0)
+  rating        Float    @default(0)
+  enabled       Boolean  @default(true)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  @@map("marketplace_presets")
+}
+
+model Agent {
+  id          String   @id @default(cuid())
+  name        String
+  description String?
+  systemPrompt String   @default("")
+  providerId  String?
+  modelId     String?
+  tools       String[]
+  capabilities String[]
+  memoryEnabled Boolean @default(true)
+  maxIterations Int      @default(5)
+  enabled     Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  provider    Provider? @relation(fields: [providerId], references: [id])
+  model       Model?    @relation(fields: [modelId], references: [id])
+  workflows   WorkflowStep[]
+  sessions    AgentSession[]
+
+  @@map("agents")
+}
+
+model ToolDefinition {
+  id          String   @id @default(cuid())
+  name        String   @unique
+  description String
+  parameters  Json
+  handler     String   // URL or internal handler identifier
+  enabled     Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@map("tool_definitions")
+}
+
+model Workflow {
+  id          String   @id @default(cuid())
+  name        String
+  description String?
+  enabled     Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  steps       WorkflowStep[]
+  executions  WorkflowExecution[]
+
+  @@map("workflows")
+}
+
+model WorkflowStep {
+  id          String   @id @default(cuid())
+  workflowId  String
+  agentId     String
+  name        String
+  inputMapping Json     // How inputs from previous steps are mapped
+  outputMapping Json    // How outputs are passed to next steps
+  order       Int
+  enabled     Boolean  @default(true)
+
+  workflow    Workflow @relation(fields: [workflowId], references: [id], onDelete: Cascade)
+  agent       Agent    @relation(fields: [agentId], references: [id], onDelete: Cascade)
+
+  @@map("workflow_steps")
+}
+
+model WorkflowExecution {
+  id          String   @id @default(cuid())
+  workflowId  String
+  status      String   @default("running") // running, completed, failed
+  input       Json?
+  output      Json?
+  startedAt   DateTime @default(now())
+  completedAt DateTime?
+  error       String?
+
+  workflow    Workflow @relation(fields: [workflowId], references: [id], onDelete: Cascade)
+  stepResults WorkflowStepResult[]
+
+  @@map("workflow_executions")
+}
+
+model WorkflowStepResult {
+  id          String   @id @default(cuid())
+  executionId String
+  stepId      String
+  status      String   @default("pending")
+  input       Json?
+  output      Json?
+  startedAt   DateTime?
+  completedAt DateTime?
+  error       String?
+
+  execution   WorkflowExecution @relation(fields: [executionId], references: [id], onDelete: Cascade)
+
+  @@map("workflow_step_results")
+}
+
+model AgentSession {
+  id          String   @id @default(cuid())
+  agentId     String
+  userId      String?
+  title       String?
+  status      String   @default("active")
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  agent       Agent    @relation(fields: [agentId], references: [id], onDelete: Cascade)
+  messages    AgentMessage[]
+  memories    AgentMemory[]
+
+  @@map("agent_sessions")
+}
+
+model AgentMessage {
+  id          String   @id @default(cuid())
+  sessionId   String
+  role        String   // system, user, assistant, tool
+  content     String
+  toolCalls   Json?    // Array of tool calls
+  toolCallId  String?  // ID of the tool call this message responds to
+  metadata    Json?
+  createdAt   DateTime @default(now())
+
+  session     AgentSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+
+  @@index([sessionId, createdAt])
+  @@map("agent_messages")
+}
+
+model AgentMemory {
+  id          String   @id @default(cuid())
+  sessionId   String?
+  agentId     String
+  type        String   @default("conversation") // conversation, fact, preference
+  content     String
+  embedding   Json?    // Vector embedding for RAG
+  metadata    Json?
+  createdAt   DateTime @default(now())
+
+  session     AgentSession? @relation(fields: [sessionId], references: [id], onDelete: SetNull)
+
+  @@index([agentId, type])
+  @@index([sessionId, createdAt])
+  @@map("agent_memories")
+}

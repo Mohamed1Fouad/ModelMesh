@@ -1,0 +1,103 @@
+{
+  "name": "modelmesh-vscode",
+  "displayName": "ModelMesh",
+  "description": "AI coding assistant powered by ModelMesh — route requests to the best model automatically.",
+  "version": "0.1.0",
+  "publisher": "modelmesh",
+  "engines": { "vscode": "^>=1.90.0" },
+  "categories": ["Machine Learning", "Programming Languages", "Snippets"],
+  "keywords": ["ai", "llm", "chatgpt", "claude", "ollama", "openai", "routing"],
+  "activationEvents": ["onStartupFinished"],
+  "main": "./out/extension.js",
+  "contributes": {
+    "configuration": {
+      "title": "ModelMesh",
+      "properties": {
+        "modelmesh.baseUrl": {
+          "type": "string",
+          "default": "http://localhost:3000",
+          "description": "ModelMesh gateway base URL"
+        },
+        "modelmesh.apiKey": {
+          "type": "string",
+          "default": "",
+          "description": "API key for the ModelMesh gateway"
+        },
+        "modelmesh.defaultModel": {
+          "type": "string",
+          "default": "",
+          "description": "Default model to use (empty = auto-route)"
+        },
+        "modelmesh.inlineChat.enabled": {
+          "type": "boolean",
+          "default": true,
+          "description": "Enable inline chat"
+        },
+        "modelmesh.codeCompletion.enabled": {
+          "type": "boolean",
+          "default": false,
+          "description": "Enable code completion (experimental)"
+        }
+      }
+    },
+    "commands": [
+      {
+        "command": "modelmesh.openChat",
+        "title": "Open Chat",
+        "category": "ModelMesh"
+      },
+      {
+        "command": "modelmesh.explainCode",
+        "title": "Explain Selected Code",
+        "category": "ModelMesh"
+      },
+      {
+        "command": "modelmesh.generateCode",
+        "title": "Generate Code from Comment",
+        "category": "ModelMesh"
+      },
+      {
+        "command": "modelmesh.switchModel",
+        "title": "Switch Model",
+        "category": "ModelMesh"
+      },
+      {
+        "command": "modelmesh.toggleCompletion",
+        "title": "Toggle Code Completion",
+        "category": "ModelMesh"
+      }
+    ],
+    "menus": {
+      "editor/context": [
+        {
+          "command": "modelmesh.explainCode",
+          "group": "9_cutcopypaste@5",
+          "when": "editorHasSelection"
+        },
+        {
+          "command": "modelmesh.generateCode",
+          "group": "9_cutcopypaste@6"
+        }
+      ]
+    },
+    "views": {
+      "explorer": [
+        {
+          "id": "modelmesh.chat",
+          "name": "ModelMesh Chat",
+          "when": "modelmesh.enabled"
+        }
+      ]
+    }
+  },
+  "scripts": {
+    "build": "tsc -p ./",
+    "watch": "tsc -watch -p ./",
+    "package": "vsce package"
+  },
+  "devDependencies": {
+    "@types/vscode": "^1.90.0",
+    "typescript": "^5.6.0",
+    "@modelmesh/sdk": "workspace:*"
+  }
+}

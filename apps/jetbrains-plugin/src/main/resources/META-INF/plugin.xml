@@ -1,0 +1,62 @@
+<idea-plugin>
+    <id>com.modelmesh.plugin</id>
+    <name>ModelMesh</name>
+    <version>0.1.0</version>
+    <vendor email="hello@modelmesh.dev" url="https://modelmesh.dev">ModelMesh</vendor>
+
+    <description><![CDATA[
+        <p>AI coding assistant powered by ModelMesh — route requests to the best model automatically.</p>
+        <ul>
+            <li>Chat with AI models through your own ModelMesh gateway</li>
+            <li>Switch between models on the fly</li>
+            <li>Explain selected code with one click</li>
+            <li>Supports OpenAI, Anthropic, Ollama, and more</li>
+        </ul>
+    ]]></description>
+
+    <change-notes><![CDATA[
+        <p>0.1.0 — Initial release with chat panel, model switching, and settings.</p>
+    ]]></change-notes>
+
+    <idea-version since-build="232"/>
+
+    <depends>com.intellij.modules.platform</depends>
+
+    <extensions defaultExtensionNs="com.intellij">
+        <applicationConfigurable
+            parentId="tools"
+            instance="com.modelmesh.plugin.settings.ModelMeshSettingsConfigurable"
+            id="com.modelmesh.plugin.settings.ModelMeshSettingsConfigurable"
+            displayName="ModelMesh"/>
+        <toolWindow
+            factoryClass="com.modelmesh.plugin.toolwindow.ModelMeshToolWindowFactory"
+            id="ModelMesh Chat"
+            anchor="right"
+            icon="/icons/modelmesh.svg"/>
+    </extensions>
+
+    <actions>
+        <action
+            id="modelmesh.openChat"
+            class="com.modelmesh.plugin.actions.OpenChatAction"
+            text="Open ModelMesh Chat"
+            description="Open the ModelMesh chat panel">
+            <add-to-group group-id="ToolsMenu" anchor="last"/>
+            <keyboard-shortcut keymap="$default" first-keystroke="ctrl shift M"/>
+        </action>
+        <action
+            id="modelmesh.switchModel"
+            class="com.modelmesh.plugin.actions.SwitchModelAction"
+            text="Switch Model"
+            description="Switch the active AI model">
+            <add-to-group group-id="ToolsMenu" anchor="last"/>
+        </action>
+        <action
+            id="modelmesh.explainCode"
+            class="com.modelmesh.plugin.actions.ExplainCodeAction"
+            text="Explain with ModelMesh"
+            description="Explain the selected code">
+            <add-to-group group-id="EditorPopupMenu" anchor="after" relative-to-action="$Separator"/>
+        </action>
+    </actions>
+</idea-plugin>

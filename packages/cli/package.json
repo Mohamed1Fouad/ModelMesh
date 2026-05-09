@@ -1,0 +1,23 @@
+{
+  "name": "@modelmesh/cli",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "bin": {
+    "mm": "./dist/cli.js"
+  },
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsc --watch",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "commander": "^12.0.0",
+    "@modelmesh/sdk": "workspace:*",
+    "@modelmesh/shared": "workspace:*"
+  },
+  "devDependencies": {
+    "typescript": "^5.6.0",
+    "@modelmesh/config": "workspace:*"
+  }
+}

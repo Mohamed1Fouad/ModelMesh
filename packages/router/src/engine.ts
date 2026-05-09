@@ -97,7 +97,7 @@ export class RouterEngine {
     };
   }
 
-  private gatherCandidates(request: RoutingRequest): ScoredProvider[] {
+  private gatherCandidates(_request: RoutingRequest): ScoredProvider[] {
     const candidates: ScoredProvider[] = [];
     for (const provider of this.options.providers) {
       if (!provider.enabled) continue;

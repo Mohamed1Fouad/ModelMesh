@@ -6,7 +6,6 @@ WORKDIR /app
 COPY pnpm-workspace.yaml package.json turbo.json ./
 COPY packages ./packages
 COPY apps/gateway ./apps/gateway
-COPY apps/dashboard ./apps/dashboard
 RUN pnpm install --frozen-lockfile
 RUN pnpm run build --filter=@modelmesh/gateway --filter=@modelmesh/db --filter=@modelmesh/router --filter=@modelmesh/shared
 

@@ -1,16 +1,22 @@
 {
-  "extends": "@modelmesh/config/tsconfig.base.json",
   "compilerOptions": {
     "outDir": "out",
-    "rootDir": "src",
-    "lib": ["ES2022"],
+    "rootDir": ".",
+    "baseUrl": ".",
+    "paths": {
+      "@modelmesh/sdk": ["../../packages/sdk/src/index.ts"],
+      "@modelmesh/shared": ["../../packages/shared/src/index.ts"]
+    },
+    "lib": ["ES2022", "DOM"],
     "target": "ES2022",
     "module": "NodeNext",
     "moduleResolution": "NodeNext",
     "sourceMap": true,
     "strict": true,
-    "composite": true
+    "esModuleInterop": true,
+    "skipLibCheck": true,
+    "forceConsistentCasingInFileNames": true
   },
-  "include": ["src/**/*"],
-  "exclude": ["node_modules", ".vscode-test"]
+  "include": ["src/**/*", "../../packages/sdk/src/**/*", "../../packages/shared/src/**/*"],
+  "exclude": ["node_modules", ".vscode-test", "out"]
 }

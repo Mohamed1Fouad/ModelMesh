@@ -51,7 +51,7 @@ class ModelMeshChatPanel(project: Project) : JPanel(BorderLayout()) {
                 inputField.text = ""
                 sendButton.isEnabled = false
 
-                SwingWorker<String, Void>() {
+                object : SwingWorker<String, Void>() {
                     override fun doInBackground(): String {
                         return client.chatCompletion(
                             listOf(ModelMeshClient.ChatMessage("user", text))
@@ -90,7 +90,7 @@ class ModelMeshChatPanel(project: Project) : JPanel(BorderLayout()) {
     }
 
     fun sendSystemMessage(text: String) {
-        SwingWorker<String, Void>() {
+        object : SwingWorker<String, Void>() {
             override fun doInBackground(): String {
                 return client.chatCompletion(
                     listOf(ModelMeshClient.ChatMessage("user", text))

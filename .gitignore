@@ -30,10 +30,22 @@ Thumbs.db
 .claude/
 
 # Docker
-*.dockerignore
+# (keep .dockerignore files in repo, only ignore inside Docker contexts if needed)
 
 # Prisma
 packages/db/prisma/migrations/*/migration.sql
 
 # Turbo
 .turbo/
+
+# VSCode extension build artifacts
+*.vsix
+
+# JetBrains plugin build artifacts
+apps/jetbrains-plugin/build/
+apps/jetbrains-plugin/.gradle/
+
+# Generated JS in src (should be in dist/ only)
+packages/*/src/*.js
+packages/*/src/*.d.ts
+packages/*/src/*.map

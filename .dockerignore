@@ -1,0 +1,13 @@
+node_modules
+.pnpm-store
+.git
+.gitignore
+.env
+.env.*
+*.log
+.vscode
+.idea
+.DS_Store
+.turbo
+*.md
+CLAUDE.md

@@ -4,10 +4,26 @@
   "description": "AI coding assistant powered by ModelMesh — route requests to the best model automatically.",
   "version": "0.1.0",
   "publisher": "modelmesh",
-  "engines": { "vscode": "^>=1.90.0" },
-  "categories": ["Machine Learning", "Programming Languages", "Snippets"],
-  "keywords": ["ai", "llm", "chatgpt", "claude", "ollama", "openai", "routing"],
-  "activationEvents": ["onStartupFinished"],
+  "engines": {
+    "vscode": "^1.90.0"
+  },
+  "categories": [
+    "Machine Learning",
+    "Programming Languages",
+    "Snippets"
+  ],
+  "keywords": [
+    "ai",
+    "llm",
+    "chatgpt",
+    "claude",
+    "ollama",
+    "openai",
+    "routing"
+  ],
+  "activationEvents": [
+    "onStartupFinished"
+  ],
   "main": "./out/extension.js",
   "contributes": {
     "configuration": {
@@ -91,13 +107,14 @@
     }
   },
   "scripts": {
-    "build": "tsc -p ./",
-    "watch": "tsc -watch -p ./",
-    "package": "vsce package"
+    "build": "node build.js --production",
+    "watch": "node build.js",
+    "package": "vsce package --no-dependencies"
   },
   "devDependencies": {
     "@types/vscode": "^1.90.0",
-    "typescript": "^5.6.0",
-    "@modelmesh/sdk": "workspace:*"
+    "@vscode/vsce": "^3.0.0",
+    "esbuild": "^0.28.0",
+    "typescript": "^5.6.0"
   }
 }

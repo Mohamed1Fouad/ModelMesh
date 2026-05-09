@@ -1,6 +1,7 @@
-import type { FastifyInstance, FastifyRequest, FastifyReply } from "fastify";
+import type { FastifyInstance, FastifyReply } from "fastify";
 import { prisma } from "@modelmesh/db";
-import { authMiddleware, requirePermission, AuthenticatedRequest } from "../auth/middleware.js";
+import { authMiddleware, requirePermission } from "../auth/middleware.js";
+import type { AuthenticatedRequest } from "../auth/middleware.js";
 
 export async function registerMarketplaceRoutes(fastify: FastifyInstance) {
   fastify.addHook("onRequest", authMiddleware);
@@ -29,7 +30,7 @@ export async function registerMarketplaceRoutes(fastify: FastifyInstance) {
     });
 
     return reply.send({
-      data: presets.map((p) => ({
+      data: presets.map((p: { id: string; name: string; description: string | null; category: string; providerName: string; modelId: string; capabilities: string[]; contextWindow: number; pricingPrompt: number; pricingCompletion: number; tags: string[]; downloads: number; rating: number; config: unknown }) => ({
         id: p.id,
         name: p.name,
         description: p.description,

@@ -49,7 +49,7 @@ describe("providers actions", () => {
 
   it("createProvider applies defaults", async () => {
     vi.mocked(prisma.provider.create).mockResolvedValue({ id: "p1" } as any);
-    const result = await createProvider({ name: "openai", displayName: "OpenAI" });
+    await createProvider({ name: "openai", displayName: "OpenAI" });
     expect(prisma.provider.create).toHaveBeenCalledWith({
       data: {
         name: "openai",

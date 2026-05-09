@@ -35,7 +35,7 @@ describe("routing-rules actions", () => {
 
   it("createRoutingRule casts condition and action", async () => {
     vi.mocked(prisma.routingRule.create).mockResolvedValue({ id: "r2" } as any);
-    const result = await createRoutingRule({ name: "Local", priority: 10, condition: { provider: "ollama" }, action: { route_to: "ollama" } });
+    await createRoutingRule({ name: "Local", priority: 10, condition: { provider: "ollama" }, action: { route_to: "ollama" } });
     expect(prisma.routingRule.create).toHaveBeenCalledWith({
       data: {
         name: "Local",

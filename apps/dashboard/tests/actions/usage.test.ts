@@ -29,7 +29,6 @@ describe("usage actions", () => {
   });
 
   it("getUsageStats aggregates all dimensions", async () => {
-    const since = expect.any(Date);
     vi.mocked(prisma.usageLog.count).mockResolvedValue(100);
     vi.mocked(prisma.usageLog.aggregate)
       .mockResolvedValueOnce({ _sum: { cost: 1.23, promptTokens: 500, completionTokens: 300 } } as any)

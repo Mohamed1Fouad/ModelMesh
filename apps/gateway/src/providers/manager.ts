@@ -16,7 +16,7 @@ export class ProviderManager {
       where: { enabled: true },
       orderBy: { priority: "desc" },
     });
-    return rules.map((r) => ({
+    return rules.map((r: { id: string; name: string; priority: number; enabled: boolean; condition: unknown; action: unknown }) => ({
       id: r.id,
       name: r.name,
       priority: r.priority,
@@ -35,7 +35,7 @@ export class ProviderManager {
       timeoutMs: dbProvider.timeoutMs,
       retries: dbProvider.retries,
       weight: dbProvider.weight,
-      models: dbProvider.models.map((m) => ({
+      models: dbProvider.models.map((m: { externalId: string; name: string; capabilities: string[]; contextWindow: number; maxTokens: number | null; promptPricePer1k: number; completionPricePer1k: number; currency: string; supportsStreaming: boolean; supportsToolUse: boolean; latencyTtftMs: number; latencyThroughputTokensPerSec: number; latencyScore: number }) => ({
         id: m.externalId,
         provider: dbProvider.name as ProviderConfig["name"],
         name: m.name,

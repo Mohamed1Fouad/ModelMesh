@@ -1,6 +1,6 @@
-import type { FastifyRequest, FastifyReply } from "fastify";
+import type { FastifyReply } from "fastify";
 import { prisma } from "@modelmesh/db";
-import { AuthenticatedRequest } from "../auth/middleware.js";
+import type { AuthenticatedRequest } from "../auth/middleware.js";
 
 const MUTATING_METHODS = new Set(["POST", "PUT", "PATCH", "DELETE"]);
 

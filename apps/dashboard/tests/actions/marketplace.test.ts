@@ -63,7 +63,7 @@ describe("marketplace actions", () => {
 
   it("createMarketplacePreset uses defaults", async () => {
     vi.mocked(prisma.marketplacePreset.create).mockResolvedValue({ id: "p2" } as any);
-    const result = await createMarketplacePreset({ name: "Qwen", providerName: "ollama", modelId: "qwen" });
+    await createMarketplacePreset({ name: "Qwen", providerName: "ollama", modelId: "qwen" });
     expect(prisma.marketplacePreset.create).toHaveBeenCalledWith({
       data: {
         name: "Qwen",

@@ -34,3 +34,6 @@ Thumbs.db
 
 # Prisma
 packages/db/prisma/migrations/*/migration.sql
+
+# Turbo
+.turbo/

@@ -49,7 +49,7 @@ export class MemoryService {
       take: params.limit ?? 20,
     });
 
-    return rows.map((r) => ({
+    return rows.map((r: { id: string; agentId: string; sessionId: string | null; type: string; content: string; embedding: unknown; metadata: unknown; createdAt: Date }) => ({
       id: r.id,
       agentId: r.agentId,
       sessionId: r.sessionId ?? undefined,
@@ -77,7 +77,7 @@ export class MemoryService {
     });
 
     const scored = rows
-      .map((r) => {
+      .map((r: { embedding: unknown }) => {
         const emb = r.embedding as number[] | null;
         if (!emb || emb.length !== params.embedding.length) return null;
 
@@ -87,11 +87,11 @@ export class MemoryService {
           similarity,
         };
       })
-      .filter((r): r is NonNullable<typeof r> => r !== null)
-      .sort((a, b) => b.similarity - a.similarity)
+      .filter((r: { embedding: unknown; similarity: number } | null): r is { embedding: unknown; similarity: number } => r !== null)
+      .sort((a: { similarity: number }, b: { similarity: number }) => b.similarity - a.similarity)
       .slice(0, params.limit ?? 5);
 
-    return scored.map((r) => ({
+    return scored.map((r: { id: string; agentId: string; sessionId: string | null; type: string; content: string; embedding: unknown; metadata: unknown; createdAt: Date }) => ({
       id: r.id,
       agentId: r.agentId,
       sessionId: r.sessionId ?? undefined,
@@ -112,7 +112,7 @@ export class MemoryService {
 
     if (memories.length === 0) return "";
 
-    return memories.map((m) => `[${m.type}] ${m.content}`).join("\n");
+    return memories.map((m: { type: string; content: string }) => `[${m.type}] ${m.content}`).join("\n");
   }
 
   async closeSession(sessionId: string): Promise<void> {

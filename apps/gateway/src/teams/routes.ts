@@ -1,7 +1,8 @@
-import type { FastifyInstance, FastifyRequest, FastifyReply } from "fastify";
+import type { FastifyInstance, FastifyReply } from "fastify";
 import { prisma } from "@modelmesh/db";
 import { v4 as uuidv4 } from "uuid";
-import { authMiddleware, teamContextMiddleware, requirePermission, AuthenticatedRequest } from "../auth/middleware.js";
+import { authMiddleware, teamContextMiddleware, requirePermission } from "../auth/middleware.js";
+import type { AuthenticatedRequest } from "../auth/middleware.js";
 
 export async function registerTeamRoutes(fastify: FastifyInstance) {
   // Apply auth middleware to all team routes
@@ -18,7 +19,7 @@ export async function registerTeamRoutes(fastify: FastifyInstance) {
     });
 
     return reply.send({
-      data: memberships.map((m) => ({
+      data: memberships.map((m: { team: { id: string; name: string; slug: string; description: string | null; enabled: boolean }; role: string; joinedAt: Date }) => ({
         id: m.team.id,
         name: m.team.name,
         slug: m.team.slug,
@@ -49,7 +50,7 @@ export async function registerTeamRoutes(fastify: FastifyInstance) {
       slug: team.slug,
       description: team.description,
       enabled: team.enabled,
-      members: team.members.map((m) => ({
+      members: team.members.map((m: { id: string; userId: string; user: { email: string; name: string | null; avatar: string | null }; role: string; joinedAt: Date }) => ({
         id: m.id,
         userId: m.userId,
         email: m.user.email,
@@ -58,7 +59,7 @@ export async function registerTeamRoutes(fastify: FastifyInstance) {
         role: m.role,
         joinedAt: m.joinedAt,
       })),
-      providers: team.providers.map((tp) => ({
+      providers: team.providers.map((tp: { id: string; providerId: string; provider: { name: string }; enabled: boolean; customBaseUrl: string | null; weight: number }) => ({
         id: tp.id,
         providerId: tp.providerId,
         name: tp.provider.name,

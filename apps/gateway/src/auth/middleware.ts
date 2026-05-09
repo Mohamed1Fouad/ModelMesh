@@ -130,7 +130,7 @@ export function requirePermission(permission: string) {
 
 export async function teamContextMiddleware(
   request: AuthenticatedRequest,
-  reply: FastifyReply
+  _reply: FastifyReply
 ): Promise<void> {
   if (!request.user || request.user.id === "api-key" || request.user.id === "anonymous") return;
 

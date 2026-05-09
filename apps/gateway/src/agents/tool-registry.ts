@@ -103,7 +103,6 @@ export function registerBuiltInTools(engine: AgentEngine) {
   engine.registerTool("gateway_query", async (args) => {
     const { prisma } = await import("@modelmesh/db");
     const entity = args.entity as string;
-    const action = (args.action as string) ?? "list";
 
     try {
       switch (entity) {

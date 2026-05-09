@@ -4,9 +4,7 @@ import type {
   AgentRequest,
   AgentResponse,
   AgentToolCall,
-  AgentToolResult,
   AgentMessage,
-  AgentSession,
 } from "@modelmesh/shared";
 import type { ChatCompletionBody } from "../schemas.js";
 import { createProviderAdapter } from "../providers/factory.js";
@@ -71,11 +69,12 @@ export class AgentEngine {
 
       if (toolCalls && toolCalls.length > 0) {
         // Execute tools and continue loop
+        const typedToolCalls = toolCalls as Array<{ id: string; function: { name: string; arguments: string } }>;
         messages.push({
           id: crypto.randomUUID(),
           role: "assistant",
           content: content ?? "",
-          toolCalls: toolCalls.map((tc) => ({
+          toolCalls: typedToolCalls.map((tc) => ({
             id: tc.id,
             name: tc.function.name,
             arguments: JSON.parse(tc.function.arguments),
@@ -83,7 +82,7 @@ export class AgentEngine {
           createdAt: new Date(),
         });
 
-        for (const tc of toolCalls) {
+        for (const tc of typedToolCalls) {
           const result = await this.executeTool(tc.function.name, JSON.parse(tc.function.arguments));
           messages.push({
             id: crypto.randomUUID(),
@@ -165,7 +164,7 @@ export class AgentEngine {
       take: 50, // Keep last 50 messages for context
     });
 
-    return rows.map((r) => ({
+    return rows.map((r: { id: string; role: string; content: string; toolCalls: unknown; toolCallId: string | null; metadata: unknown; createdAt: Date }) => ({
       id: r.id,
       role: r.role as AgentMessage["role"],
       content: r.content,
@@ -209,7 +208,7 @@ export class AgentEngine {
       timeoutMs: provider.timeoutMs,
       retries: provider.retries,
       weight: provider.weight,
-      models: provider.models.map((m) => ({
+      models: provider.models.map((m: { externalId: string; name: string; capabilities: string[]; contextWindow: number; maxTokens: number | null; promptPricePer1k: number; completionPricePer1k: number; currency: string; supportsStreaming: boolean; supportsToolUse: boolean; latencyTtftMs: number; latencyThroughputTokensPerSec: number; latencyScore: number }) => ({
         id: m.externalId,
         provider: provider.name as ProviderConfig["name"],
         name: m.name,

@@ -4,7 +4,8 @@ import { AgentEngine } from "./engine.js";
 import { WorkflowEngine } from "./workflow-engine.js";
 import { MemoryService } from "./memory-service.js";
 import { registerBuiltInTools } from "./tool-registry.js";
-import { authMiddleware, requirePermission, AuthenticatedRequest } from "../auth/middleware.js";
+import { authMiddleware, requirePermission } from "../auth/middleware.js";
+import type { AuthenticatedRequest } from "../auth/middleware.js";
 
 export async function registerAgentRoutes(fastify: FastifyInstance) {
   const agentEngine = new AgentEngine();
@@ -17,13 +18,13 @@ export async function registerAgentRoutes(fastify: FastifyInstance) {
   fastify.addHook("onRequest", authMiddleware);
 
   // List agents
-  fastify.get("/v1/agents", { preHandler: requirePermission("agent:read") }, async (request: AuthenticatedRequest, reply) => {
+  fastify.get("/v1/agents", { preHandler: requirePermission("agent:read") }, async (_request: AuthenticatedRequest, reply) => {
     const agents = await prisma.agent.findMany({
       where: { enabled: true },
       include: { provider: true, model: true },
     });
     return reply.send({
-      data: agents.map((a) => ({
+      data: agents.map((a: { id: string; name: string; description: string | null; provider: { name: string } | null; model: { externalId: string } | null; capabilities: string[]; tools: string[]; memoryEnabled: boolean }) => ({
         id: a.id,
         name: a.name,
         description: a.description,
@@ -51,7 +52,7 @@ export async function registerAgentRoutes(fastify: FastifyInstance) {
   fastify.post("/v1/agents/:id/execute", { preHandler: requirePermission("agent:write") }, async (request: AuthenticatedRequest, reply) => {
     const { id } = request.params as { id: string };
     const body = request.body as {
-      messages?: Array<{ role: string; content: string }>;
+      messages?: Array<{ role: "system" | "user" | "assistant" | "tool"; content: string }>;
       sessionId?: string;
       stream?: boolean;
       userId?: string;
@@ -96,7 +97,7 @@ export async function registerAgentRoutes(fastify: FastifyInstance) {
   });
 
   // List workflows
-  fastify.get("/v1/workflows", { preHandler: requirePermission("workflow:read") }, async (request: AuthenticatedRequest, reply) => {
+  fastify.get("/v1/workflows", { preHandler: requirePermission("workflow:read") }, async (_request: AuthenticatedRequest, reply) => {
     const workflows = await prisma.workflow.findMany({
       where: { enabled: true },
       include: { steps: { include: { agent: true }, orderBy: { order: "asc" } } },
@@ -173,7 +174,7 @@ export async function registerAgentRoutes(fastify: FastifyInstance) {
   });
 
   // Tools: List
-  fastify.get("/v1/tools", { preHandler: requirePermission("agent:read") }, async (request: AuthenticatedRequest, reply) => {
+  fastify.get("/v1/tools", { preHandler: requirePermission("agent:read") }, async (_request: AuthenticatedRequest, reply) => {
     const tools = await prisma.toolDefinition.findMany({
       where: { enabled: true },
     });

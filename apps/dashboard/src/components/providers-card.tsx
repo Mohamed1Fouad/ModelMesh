@@ -53,7 +53,7 @@ export function ProvidersCard() {
                 <span className="font-medium">{p.displayName}</span>
                 <Badge
                   variant={p.enabled ? "success" : "muted"}
-                  size="sm"
+                  className="text-xs"
                 >
                   {p.enabled ? "Active" : "Inactive"}
                 </Badge>

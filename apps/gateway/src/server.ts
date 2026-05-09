@@ -52,7 +52,7 @@ const healthMonitor = new HealthMonitor({
 
 async function refreshProviders() {
   const dbProviders = await providerManager.loadProviders();
-  const configs = dbProviders.map((p) => providerManager.toConfig(p));
+  const configs = dbProviders.map((p: { id: string; name: string; enabled: boolean; baseUrl: string | null; apiKey: string | null; timeoutMs: number; retries: number; weight: number; models: { externalId: string; name: string; capabilities: string[]; contextWindow: number; maxTokens: number | null; promptPricePer1k: number; completionPricePer1k: number; currency: string; supportsStreaming: boolean; supportsToolUse: boolean; latencyTtftMs: number; latencyThroughputTokensPerSec: number; latencyScore: number }[] }) => providerManager.toConfig(p));
   engine["options"].providers = configs;
   engine["options"].rules = await providerManager.loadRules();
   healthMonitor.stop();
@@ -70,7 +70,7 @@ fastify.get("/v1/models", async (_request, reply) => {
     include: { provider: true },
   });
 
-  const models = dbModels.map((m) => ({
+  const models = dbModels.map((m: { provider: { name: string; displayName: string }; externalId: string; createdAt: Date }) => ({
     id: `${m.provider.name}/${m.externalId}`,
     object: "model",
     created: Math.floor(m.createdAt.getTime() / 1000),
@@ -117,7 +117,7 @@ fastify.post("/v1/chat/completions", async (request, reply) => {
   fastify.log.info(`[${reqId}] Routed to ${route.selectedProvider}/${route.selectedModel} (score: ${route.score})`);
 
   const adapter = createProviderAdapter(route.selectedProvider);
-  const providerConfig = engine["options"].providers.find((p) => p.name === route.selectedProvider);
+  const providerConfig = engine["options"].providers.find((p: { name: string }) => p.name === route.selectedProvider);
 
   if (!providerConfig) {
     return reply.status(500).send({ error: { message: "Provider config not found", type: "server_error" } });
@@ -163,7 +163,7 @@ fastify.post("/v1/chat/completions", async (request, reply) => {
       const fallback = route.alternatives[0];
       fastify.log.info(`[${reqId}] Fallback to ${fallback.provider}/${fallback.model}`);
       const fallbackAdapter = createProviderAdapter(fallback.provider);
-      const fallbackConfig = engine["options"].providers.find((p) => p.name === fallback.provider);
+      const fallbackConfig = engine["options"].providers.find((p: { name: string }) => p.name === fallback.provider);
       if (fallbackConfig) {
         try {
           const fbResponse = await fallbackAdapter.chatCompletion(body, fallbackConfig, fallback.model);
@@ -213,7 +213,7 @@ fastify.post("/v1/chat/completions", async (request, reply) => {
   }
 });
 
-fastify.post("/v1/embeddings", async (request, reply) => {
+fastify.post("/v1/embeddings", async (_request, reply) => {
   return reply.status(501).send({ error: { message: "Embeddings not yet implemented", type: "not_implemented" } });
 });
 
@@ -289,7 +289,8 @@ function inferCapabilities(body: Record<string, unknown>): ModelCapability[] {
   const caps: ModelCapability[] = ["chat"];
   if (body.tools) caps.push("tool_use", "function_calling");
   if (body.stream) caps.push("streaming");
-  if (body.response_format?.type === "json_object") caps.push("json_mode");
+  const responseFormat = body.response_format as { type?: string } | undefined;
+  if (responseFormat?.type === "json_object") caps.push("json_mode");
   const msgs = body.messages as Array<Record<string, unknown>>;
   if (msgs?.some((m) => Array.isArray(m.content))) caps.push("vision", "multimodal");
   return caps;

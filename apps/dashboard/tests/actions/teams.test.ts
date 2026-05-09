@@ -48,7 +48,7 @@ describe("teams actions", () => {
 
   it("getTeam returns single with relations", async () => {
     vi.mocked(prisma.team.findUnique).mockResolvedValue({ id: "t1" } as any);
-    const result = await getTeam("t1");
+    await getTeam("t1");
     expect(prisma.team.findUnique).toHaveBeenCalledWith({
       where: { id: "t1" },
       include: {
@@ -62,7 +62,7 @@ describe("teams actions", () => {
 
   it("createTeam sanitizes slug", async () => {
     vi.mocked(prisma.team.create).mockResolvedValue({ id: "t1", name: "Eng", slug: "eng-team" } as any);
-    const result = await createTeam({ name: "Eng", slug: "Eng Team!" });
+    await createTeam({ name: "Eng", slug: "Eng Team!" });
     expect(prisma.team.create).toHaveBeenCalledWith({
       data: { name: "Eng", slug: "eng-team-", description: undefined },
     });
@@ -86,7 +86,7 @@ describe("teams actions", () => {
 
   it("createInvitation with defaults", async () => {
     vi.mocked(prisma.teamInvitation.create).mockResolvedValue({ id: "i1" } as any);
-    const result = await createInvitation("t1", { email: "a@b.com" });
+    await createInvitation("t1", { email: "a@b.com" });
     expect(prisma.teamInvitation.create).toHaveBeenCalledWith({
       data: expect.objectContaining({ teamId: "t1", email: "a@b.com", role: "developer" }),
     });

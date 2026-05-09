@@ -2,7 +2,6 @@ import { prisma } from "@modelmesh/db";
 import type {
   WorkflowDefinition,
   WorkflowExecution,
-  WorkflowStepResult,
   AgentRequest,
 } from "@modelmesh/shared";
 import { AgentEngine } from "./engine.js";
@@ -129,7 +128,7 @@ export class WorkflowEngine {
       id: db.id,
       name: db.name,
       description: db.description ?? undefined,
-      steps: db.steps.map((s) => ({
+      steps: db.steps.map((s: { id: string; agentId: string; name: string; inputMapping: unknown; outputMapping: unknown; order: number }) => ({
         id: s.id,
         agentId: s.agentId,
         name: s.name,

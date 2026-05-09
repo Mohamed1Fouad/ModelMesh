@@ -16,7 +16,6 @@ import {
 } from "@/components/ui/dialog";
 import {
   createRoutingRule,
-  updateRoutingRule,
   deleteRoutingRule,
   toggleRoutingRule,
 } from "@/actions/routing-rules";
@@ -174,13 +173,13 @@ export function RoutingClient({ rules }: { rules: RoutingRule[] }) {
                 {CONDITION_TYPES.find((c) => c.value === conditionType)?.fields.map((field) => (
                   <div key={field.name} className="space-y-2">
                     <Label htmlFor={`cond_${field.name}`}>{field.label}</Label>
-                    {field.type === "select" ? (
+                    {"options" in field ? (
                       <select
                         id={`cond_${field.name}`}
                         name={`cond_${field.name}`}
                         className="flex h-9 w-full rounded-md border border-border bg-background px-3 py-1 text-sm"
                       >
-                        {field.options?.map((opt) => (
+                        {field.options?.map((opt: string) => (
                           <option key={opt} value={opt}>{opt}</option>
                         ))}
                       </select>
@@ -214,13 +213,13 @@ export function RoutingClient({ rules }: { rules: RoutingRule[] }) {
                 {ACTION_TYPES.find((a) => a.value === actionType)?.fields.map((field) => (
                   <div key={field.name} className="space-y-2">
                     <Label htmlFor={`act_${field.name}`}>{field.label}</Label>
-                    {field.type === "select" ? (
+                    {"options" in field ? (
                       <select
                         id={`act_${field.name}`}
                         name={`act_${field.name}`}
                         className="flex h-9 w-full rounded-md border border-border bg-background px-3 py-1 text-sm"
                       >
-                        {field.options?.map((opt) => (
+                        {field.options?.map((opt: string) => (
                           <option key={opt} value={opt}>{opt}</option>
                         ))}
                       </select>

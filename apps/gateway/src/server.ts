@@ -52,7 +52,7 @@ const healthMonitor = new HealthMonitor({
 
 async function refreshProviders() {
   const dbProviders = await providerManager.loadProviders();
-  const configs = dbProviders.map((p) => providerManager.toConfig(p));
+  const configs = dbProviders.map((p: typeof dbProviders[number]) => providerManager.toConfig(p));
   engine["options"].providers = configs;
   engine["options"].rules = await providerManager.loadRules();
   healthMonitor.stop();

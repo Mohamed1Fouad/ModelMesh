@@ -76,18 +76,18 @@ export class MemoryService {
       take: 100,
     });
 
-    const scored = rows
-      .map((r) => {
-        const emb = r.embedding as number[] | null;
-        if (!emb || emb.length !== params.embedding.length) return null;
-        const similarity = cosineSimilarity(params.embedding, emb);
-        return { ...r, similarity };
-      })
-      .filter((r): r is NonNullable<typeof r> => r !== null)
-      .sort((a, b) => b.similarity - a.similarity)
-      .slice(0, params.limit ?? 5);
+    type DbRow = typeof rows[number];
+    const scored: (DbRow & { similarity: number })[] = [];
+    for (const r of rows) {
+      const emb = r.embedding as number[] | null;
+      if (!emb || emb.length !== params.embedding.length) continue;
+      const similarity = cosineSimilarity(params.embedding, emb);
+      scored.push({ ...r, similarity });
+    }
+    scored.sort((a, b) => b.similarity - a.similarity);
+    const top = scored.slice(0, params.limit ?? 5);
 
-    return scored.map((r) => ({
+    return top.map((r) => ({
       id: r.id,
       agentId: r.agentId,
       sessionId: r.sessionId ?? undefined,

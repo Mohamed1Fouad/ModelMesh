@@ -51,7 +51,7 @@ export async function createMarketplacePreset(data: {
       pricingPrompt: data.pricingPrompt ?? 0,
       pricingCompletion: data.pricingCompletion ?? 0,
       tags: data.tags ?? [],
-      config: data.config ?? {},
+      config: data.config as object ?? {},
     },
   });
   revalidatePath("/marketplace");

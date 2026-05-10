@@ -53,6 +53,56 @@ For local development without auth, set `ALLOW_UNAUTHENTICATED=true` in your `.e
 
 ---
 
+## OpenClaw
+
+ModelMesh has a native OpenClaw plugin that registers it as a first-class provider.
+
+### Installation
+
+```bash
+openclaw plugins install @modelmesh/openclaw-plugin
+```
+
+Or manually from the repo:
+
+```bash
+cd ModelMesh/plugins/openclaw
+openclaw plugins install --link .
+```
+
+### Configuration
+
+Add to `~/.openclaw/openclaw.json`:
+
+```json5
+{
+  plugins: {
+    entries: {
+      modelmesh: {
+        enabled: true,
+        config: {
+          baseUrl: "http://localhost:3000",
+          apiKey: "your-modelmesh-key"
+        }
+      }
+    }
+  },
+  models: {
+    defaults: {
+      agent: { model: "modelmesh/auto" }
+    }
+  }
+}
+```
+
+### Usage
+
+- Use `modelmesh/auto` as your agent model — ModelMesh routes to the best provider
+- Run `/modelmesh` in chat to see available models
+- Run `/modelmesh-doctor` to health-check the gateway
+
+---
+
 ## JetBrains IDEs (IntelliJ, PyCharm, WebStorm, etc.)
 
 1. Download the latest plugin ZIP from the [GitHub Actions artifacts](https://github.com/Mohamed1Fouad/ModelMesh/actions)

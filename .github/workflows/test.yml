@@ -86,3 +86,9 @@ jobs:
         with:
           name: modelmesh-jetbrains
           path: apps/jetbrains-plugin/build/distributions/*.zip
+
+      - name: Upload OpenClaw plugin artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: modelmesh-openclaw-plugin
+          path: plugins/openclaw/

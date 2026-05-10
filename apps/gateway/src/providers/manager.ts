@@ -28,7 +28,7 @@ export class ProviderManager {
 
   toConfig(dbProvider: Awaited<ReturnType<typeof this.loadProviders>>[number]): ProviderConfig {
     return {
-      name: dbProvider.name as ProviderConfig["name"],
+      name: dbProvider.name.toLowerCase() as ProviderConfig["name"],
       enabled: dbProvider.enabled,
       baseUrl: dbProvider.baseUrl ?? undefined,
       apiKey: dbProvider.apiKey ?? undefined,
@@ -37,7 +37,7 @@ export class ProviderManager {
       weight: dbProvider.weight,
       models: dbProvider.models.map((m: { externalId: string; name: string; capabilities: string[]; contextWindow: number; maxTokens: number | null; promptPricePer1k: number; completionPricePer1k: number; currency: string; supportsStreaming: boolean; supportsToolUse: boolean; latencyTtftMs: number; latencyThroughputTokensPerSec: number; latencyScore: number }) => ({
         id: m.externalId,
-        provider: dbProvider.name as ProviderConfig["name"],
+        provider: dbProvider.name.toLowerCase() as ProviderConfig["name"],
         name: m.name,
         capabilities: m.capabilities as ProviderConfig["models"][number]["capabilities"],
         contextWindow: m.contextWindow,

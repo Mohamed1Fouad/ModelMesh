@@ -17,7 +17,8 @@ export async function auditLogMiddleware(
       // Skip audit log routes to avoid recursion
       if (request.url.startsWith("/v1/audit-logs")) return;
 
-      const userId = request.user?.id;
+      const rawUserId = request.user?.id;
+      const userId = rawUserId === "api-key" || rawUserId === "anonymous" ? null : rawUserId;
       const teamId = request.user?.teamId;
       const action = method.toLowerCase();
       const resource = inferResource(request.url);

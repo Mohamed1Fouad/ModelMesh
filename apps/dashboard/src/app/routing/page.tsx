@@ -5,7 +5,12 @@ import { DashboardNav } from "@/components/dashboard-nav";
 export const dynamic = "force-dynamic";
 
 export default async function RoutingPage() {
-  const rules = await getRoutingRules();
+  const rawRules = await getRoutingRules();
+  const rules = rawRules.map((r) => ({
+    ...r,
+    condition: r.condition as Record<string, unknown>,
+    action: r.action as Record<string, unknown>,
+  }));
 
   return (
     <div className="min-h-screen bg-background text-foreground">

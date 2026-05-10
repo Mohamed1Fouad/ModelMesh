@@ -1,5 +1,6 @@
 import type { FastifyRequest, FastifyReply } from "fastify";
 import { prisma } from "@modelmesh/db";
+import { createHash } from "crypto";
 
 export interface AuthenticatedRequest extends FastifyRequest {
   user?: {
@@ -52,8 +53,9 @@ export async function authMiddleware(
   const bearer = request.headers.authorization?.replace("Bearer ", "");
 
   if (apiKey) {
+    const keyHash = createHash("sha256").update(apiKey).digest("hex");
     const keyRecord = await prisma.apiKey.findUnique({
-      where: { keyHash: apiKey },
+      where: { keyHash },
     });
     if (!keyRecord || (keyRecord.expiresAt && keyRecord.expiresAt < new Date())) {
       return reply.status(401).send({ error: { message: "Invalid or expired API key", type: "authentication_error" } });
@@ -72,6 +74,26 @@ export async function authMiddleware(
   }
 
   if (bearer) {
+    // Try API key first (OpenClaw and other clients send keys as Bearer)
+    const keyHash = createHash("sha256").update(bearer).digest("hex");
+    const keyRecord = await prisma.apiKey.findUnique({
+      where: { keyHash },
+    });
+    if (keyRecord && (!keyRecord.expiresAt || keyRecord.expiresAt >= new Date())) {
+      await prisma.apiKey.update({
+        where: { id: keyRecord.id },
+        data: { usageCount: { increment: 1 }, lastUsedAt: new Date() },
+      });
+      request.user = {
+        id: "api-key",
+        email: keyRecord.name,
+        name: keyRecord.name,
+        role: "api_key",
+      };
+      return;
+    }
+
+    // Fall back to session token
     const session = await prisma.userSession.findUnique({
       where: { token: bearer },
       include: { user: true },

@@ -1,0 +1,33 @@
+{
+  "name": "@modelmesh/openclaw-plugin",
+  "version": "0.1.0",
+  "description": "OpenClaw plugin for ModelMesh — register ModelMesh as a model provider in OpenClaw",
+  "type": "module",
+  "main": "src/index.ts",
+  "openclaw": {
+    "extensions": ["./src/index.ts"],
+    "hooks": {}
+  },
+  "scripts": {
+    "build": "tsc",
+    "typecheck": "tsc --noEmit"
+  },
+  "keywords": [
+    "openclaw",
+    "openclaw-plugin",
+    "modelmesh",
+    "llm-router",
+    "model-router"
+  ],
+  "files": [
+    "src/",
+    "openclaw.plugin.json",
+    "README.md",
+    "LICENSE"
+  ],
+  "license": "MIT",
+  "devDependencies": {
+    "@types/node": "^22.19.18",
+    "typescript": "^5.7.0"
+  }
+}

@@ -1,0 +1,97 @@
+version: "3.8"
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: mm-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: modelmesh
+      POSTGRES_PASSWORD: modelmesh
+      POSTGRES_DB: modelmesh
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U modelmesh -d modelmesh"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    container_name: mm-redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    command: redis-server --appendonly yes
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  migrate:
+    build:
+      context: ..
+      dockerfile: docker/gateway.Dockerfile
+      target: builder
+    container_name: mm-migrate
+    restart: "no"
+    environment:
+      DATABASE_URL: postgresql://modelmesh:modelmesh@postgres:5432/modelmesh
+    command: ["sh", "-c", "pnpm --filter @modelmesh/db exec prisma migrate deploy --schema=prisma/schema.prisma"]
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  gateway:
+    build:
+      context: ..
+      dockerfile: docker/gateway.Dockerfile
+    container_name: mm-gateway
+    restart: unless-stopped
+    environment:
+      NODE_ENV: production
+      DATABASE_URL: postgresql://modelmesh:modelmesh@postgres:5432/modelmesh
+      REDIS_URL: redis://redis:6379
+      GATEWAY_PORT: 3000
+      LOG_LEVEL: info
+      LOCAL_FIRST: "false"
+      HEALTH_CHECK_INTERVAL_MS: "30000"
+      HEALTH_CHECK_TIMEOUT_MS: "10000"
+      HEALTH_FAILURE_THRESHOLD: "3"
+      CORS_ORIGIN: ${CORS_ORIGIN:-http://localhost:3001}
+    ports:
+      - "3000:3000"
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    volumes:
+      - ../apps/gateway:/app/apps/gateway:ro
+
+  dashboard:
+    build:
+      context: ..
+      dockerfile: docker/dashboard.Dockerfile
+    container_name: mm-dashboard
+    restart: unless-stopped
+    environment:
+      NODE_ENV: production
+      GATEWAY_URL: http://gateway:3000
+      DATABASE_URL: postgresql://modelmesh:modelmesh@postgres:5432/modelmesh
+    ports:
+      - "3001:3001"
+    depends_on:
+      - gateway
+
+volumes:
+  postgres_data:
+  redis_data:

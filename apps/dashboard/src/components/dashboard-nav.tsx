@@ -10,8 +10,8 @@ const nav = [
   { href: "/routing", label: "Routing" },
   { href: "/usage", label: "Usage" },
   { href: "/api-keys", label: "API Keys" },
-  { href: "/teams", label: "Teams" },
-  { href: "/marketplace", label: "Marketplace" },
+  // { href: "/teams", label: "Teams" },
+  // { href: "/marketplace", label: "Marketplace" },
   { href: "/audit-logs", label: "Audit" },
 ];
 

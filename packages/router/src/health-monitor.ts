@@ -49,7 +49,8 @@ export class HealthMonitor {
       const timeout = setTimeout(() => controller.abort(), this.options.timeoutMs);
 
       const baseUrl = provider.baseUrl ?? this.defaultBaseUrl(provider.name);
-      const response = await fetch(`${baseUrl}/health`, {
+      const healthPath = provider.healthCheck?.path ?? this.defaultHealthPath(provider.name);
+      const response = await fetch(`${baseUrl}${healthPath}`, {
         method: "GET",
         headers: { ...provider.defaultHeaders, "Accept": "application/json" },
         signal: controller.signal,
@@ -91,6 +92,15 @@ export class HealthMonitor {
 
     if (previous && previous.status !== status) {
       this.options.onStatusChange?.(provider.name, previous.status, status);
+    }
+  }
+
+  private defaultHealthPath(provider: ProviderName): string {
+    switch (provider) {
+      case "ollama":
+        return "/api/tags";
+      default:
+        return "/health";
     }
   }
 

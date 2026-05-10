@@ -1,0 +1,48 @@
+{
+  "id": "modelmesh",
+  "name": "ModelMesh",
+  "version": "0.1.0",
+  "description": "Open-source AI routing platform for OpenClaw. Route every request to the right model automatically using your own API keys.",
+  "providers": ["modelmesh"],
+  "configSchema": {
+    "type": "object",
+    "additionalProperties": false,
+    "properties": {
+      "baseUrl": {
+        "type": "string",
+        "description": "ModelMesh gateway base URL",
+        "default": "http://localhost:3000"
+      },
+      "apiKey": {
+        "type": "string",
+        "description": "API key for the ModelMesh gateway (optional if unauthenticated)",
+        "default": ""
+      },
+      "defaultModel": {
+        "type": "string",
+        "description": "Default model to use (empty = auto-route)",
+        "default": "auto"
+      },
+      "timeoutMs": {
+        "type": "number",
+        "description": "Request timeout in milliseconds",
+        "default": 120000
+      }
+    }
+  },
+  "uiHints": {
+    "baseUrl": {
+      "label": "Gateway URL",
+      "placeholder": "http://localhost:3000"
+    },
+    "apiKey": {
+      "label": "API Key",
+      "sensitive": true,
+      "placeholder": "Optional"
+    },
+    "defaultModel": {
+      "label": "Default Model",
+      "placeholder": "auto"
+    }
+  }
+}

@@ -36,7 +36,7 @@ model Model {
   name          String
   contextWindow Int
   maxTokens     Int?
-  capabilities  String[]
+  capabilities  String[]  @default(["chat", "completion", "embeddings", "image_generation", "vision", "function_calling", "tool_use", "reasoning", "code", "multimodal", "streaming", "json_mode"])
   supportsStreaming Boolean @default(true)
   supportsToolUse   Boolean @default(false)
   promptPricePer1k  Float  @default(0)
@@ -51,6 +51,7 @@ model Model {
 
   provider      Provider @relation(fields: [providerId], references: [id], onDelete: Cascade)
   usageLogs     UsageLog[]
+  agents        Agent[]
 
   @@unique([providerId, externalId])
   @@map("models")
@@ -107,6 +108,7 @@ model UsageLog {
 
   provider          Provider @relation(fields: [providerId], references: [id], onDelete: Cascade)
   model             Model    @relation(fields: [modelId], references: [id], onDelete: Cascade)
+  team              Team?    @relation(fields: [teamId], references: [id], onDelete: SetNull)
 
   @@index([timestamp])
   @@index([providerId, timestamp])
@@ -144,6 +146,8 @@ model Budget {
   alerted       Boolean  @default(false)
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
+
+  team        Team?    @relation(fields: [teamId], references: [id], onDelete: Cascade)
 
   @@map("budgets")
 }
@@ -264,6 +268,8 @@ model AuditLog {
   ipAddress   String?
   userAgent   String?
   timestamp   DateTime @default(now())
+
+  user        User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
 
   @@index([timestamp])
   @@index([userId, timestamp])

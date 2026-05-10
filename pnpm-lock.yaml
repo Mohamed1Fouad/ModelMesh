@@ -281,6 +281,15 @@ importers:
         specifier: ^5.6.0
         version: 5.9.3
 
+  plugins/openclaw:
+    devDependencies:
+      '@types/node':
+        specifier: ^22.19.18
+        version: 22.19.18
+      typescript:
+        specifier: ^5.7.0
+        version: 5.9.3
+
 packages:
 
   '@alloc/quick-lru@5.2.0':

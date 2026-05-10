@@ -6,7 +6,7 @@ export const dynamic = "force-dynamic";
 
 export default async function RoutingPage() {
   const rawRules = await getRoutingRules();
-  const rules = rawRules.map((r) => ({
+  const rules = rawRules.map((r: typeof rawRules[number]) => ({
     ...r,
     condition: r.condition as Record<string, unknown>,
     action: r.action as Record<string, unknown>,

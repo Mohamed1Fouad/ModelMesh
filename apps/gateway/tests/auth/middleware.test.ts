@@ -1,4 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import { createHash } from "node:crypto";
 import { authMiddleware, requirePermission, teamContextMiddleware, type AuthenticatedRequest } from "../../src/auth/middleware.js";
 import { prisma } from "@modelmesh/db";
 
@@ -27,6 +28,10 @@ function makeRequest(overrides: Partial<AuthenticatedRequest> = {}): Authenticat
     ip: "127.0.0.1",
     ...overrides,
   } as AuthenticatedRequest;
+}
+
+function hashKey(key: string): string {
+  return createHash("sha256").update(key).digest("hex");
 }
 
 function makeReply() {
@@ -77,7 +82,7 @@ describe("authMiddleware", () => {
       name: "prod-key",
       role: "api_key",
     });
-    expect(prisma.apiKey.findUnique).toHaveBeenCalledWith({ where: { keyHash: "sk-test" } });
+    expect(prisma.apiKey.findUnique).toHaveBeenCalledWith({ where: { keyHash: hashKey("sk-test") } });
     expect(prisma.apiKey.update).toHaveBeenCalled();
   });
 

@@ -312,7 +312,7 @@ describe("HealthMonitor", () => {
     await vi.advanceTimersToNextTimerAsync();
 
     expect(global.fetch).toHaveBeenCalledWith(
-      "http://my-ollama:11434/health",
+      "http://my-ollama:11434/api/tags",
       expect.any(Object)
     );
 
@@ -368,7 +368,7 @@ describe("HealthMonitor", () => {
     await vi.runAllTicks();
 
     const calls = (global.fetch as any).mock.calls;
-    expect(calls[0][0]).toBe("http://localhost:11434/health");
+    expect(calls[0][0]).toBe("http://localhost:11434/api/tags");
     expect(calls[1][0]).toBe("https://api.groq.com/openai/v1/health");
     expect(calls[2][0]).toBe("https://generativelanguage.googleapis.com/v1beta/health");
     expect(calls[3][0]).toBe("https://api.mistral.ai/v1/health");

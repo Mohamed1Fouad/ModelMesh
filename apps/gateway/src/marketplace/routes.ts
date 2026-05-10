@@ -88,6 +88,7 @@ export async function registerMarketplaceRoutes(fastify: FastifyInstance) {
           },
         },
       },
+      include: { models: true },
     });
 
     await prisma.marketplacePreset.update({

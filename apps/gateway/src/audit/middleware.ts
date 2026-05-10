@@ -31,7 +31,7 @@ export async function auditLogMiddleware(
           action,
           resource,
           resourceId,
-          details: { body: sanitizeBody(request.body), query: request.query, params: request.params },
+          details: { body: sanitizeBody(request.body), query: request.query, params: request.params } as object,
           ipAddress: request.ip,
           userAgent: request.headers["user-agent"] ?? null,
         },

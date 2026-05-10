@@ -70,28 +70,24 @@ export class MemoryService {
     const rows = await prisma.agentMemory.findMany({
       where: {
         agentId: params.agentId,
-        embedding: { not: null },
+        embedding: { not: null } as unknown as { not: object },
       },
       orderBy: { createdAt: "desc" },
       take: 100,
     });
 
     const scored = rows
-      .map((r: { embedding: unknown }) => {
+      .map((r) => {
         const emb = r.embedding as number[] | null;
         if (!emb || emb.length !== params.embedding.length) return null;
-
         const similarity = cosineSimilarity(params.embedding, emb);
-        return {
-          ...r,
-          similarity,
-        };
+        return { ...r, similarity };
       })
-      .filter((r: { embedding: unknown; similarity: number } | null): r is { embedding: unknown; similarity: number } => r !== null)
-      .sort((a: { similarity: number }, b: { similarity: number }) => b.similarity - a.similarity)
+      .filter((r): r is NonNullable<typeof r> => r !== null)
+      .sort((a, b) => b.similarity - a.similarity)
       .slice(0, params.limit ?? 5);
 
-    return scored.map((r: { id: string; agentId: string; sessionId: string | null; type: string; content: string; embedding: unknown; metadata: unknown; createdAt: Date }) => ({
+    return scored.map((r) => ({
       id: r.id,
       agentId: r.agentId,
       sessionId: r.sessionId ?? undefined,

@@ -52,7 +52,7 @@ const healthMonitor = new HealthMonitor({
 
 async function refreshProviders() {
   const dbProviders = await providerManager.loadProviders();
-  const configs = dbProviders.map((p: { id: string; name: string; enabled: boolean; baseUrl: string | null; apiKey: string | null; timeoutMs: number; retries: number; weight: number; models: { externalId: string; name: string; capabilities: string[]; contextWindow: number; maxTokens: number | null; promptPricePer1k: number; completionPricePer1k: number; currency: string; supportsStreaming: boolean; supportsToolUse: boolean; latencyTtftMs: number; latencyThroughputTokensPerSec: number; latencyScore: number }[] }) => providerManager.toConfig(p));
+  const configs = dbProviders.map((p) => providerManager.toConfig(p));
   engine["options"].providers = configs;
   engine["options"].rules = await providerManager.loadRules();
   healthMonitor.stop();

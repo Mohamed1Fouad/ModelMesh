@@ -22,6 +22,13 @@ import {
   updateModel,
   deleteModel,
 } from "@/actions/providers";
+import {
+  getOpenRouterModelsForProvider,
+  SUPPORTED_PROVIDERS,
+  getProviderInfo,
+  inferCapabilities,
+} from "@/actions/openrouter";
+import type { OpenRouterModel } from "@/actions/openrouter";
 
 interface Provider {
   id: string;
@@ -55,6 +62,11 @@ export function ProvidersClient({ providers }: { providers: Provider[] }) {
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [expandedProvider, setExpandedProvider] = useState<string | null>(null);
   const [isAddModelOpen, setIsAddModelOpen] = useState<string | null>(null);
+  const [editProviderId, setEditProviderId] = useState<string | null>(null);
+  const [editModelId, setEditModelId] = useState<string | null>(null);
+  const [orModelsMap, setOrModelsMap] = useState<Record<string, OpenRouterModel[]>>({});
+  const [orLoadingMap, setOrLoadingMap] = useState<Record<string, boolean>>({});
+  const [orSelectedMap, setOrSelectedMap] = useState<Record<string, string>>({});
 
   async function handleCreate(formData: FormData) {
     await createProvider({
@@ -67,6 +79,19 @@ export function ProvidersClient({ providers }: { providers: Provider[] }) {
       weight: Number(formData.get("weight") || 1),
     });
     setIsCreateOpen(false);
+  }
+
+  async function handleEditProvider(formData: FormData) {
+    if (!editProviderId) return;
+    await updateProvider(editProviderId, {
+      displayName: formData.get("displayName") as string,
+      baseUrl: (formData.get("baseUrl") as string) || undefined,
+      apiKey: (formData.get("apiKey") as string) || undefined,
+      timeoutMs: Number(formData.get("timeoutMs") || 30000),
+      retries: Number(formData.get("retries") || 3),
+      weight: Number(formData.get("weight") || 1),
+    });
+    setEditProviderId(null);
   }
 
   async function handleToggleProvider(id: string, enabled: boolean) {
@@ -95,6 +120,22 @@ export function ProvidersClient({ providers }: { providers: Provider[] }) {
     setIsAddModelOpen(null);
   }
 
+  async function handleEditModel(formData: FormData) {
+    if (!editModelId) return;
+    await updateModel(editModelId, {
+      name: formData.get("name") as string,
+      contextWindow: Number(formData.get("contextWindow")),
+      maxTokens: Number(formData.get("maxTokens")) || undefined,
+      capabilities: (formData.get("capabilities") as string).split(",").map((c) => c.trim()),
+      supportsStreaming: formData.get("supportsStreaming") === "on",
+      supportsToolUse: formData.get("supportsToolUse") === "on",
+      promptPricePer1k: Number(formData.get("promptPricePer1k") || 0),
+      completionPricePer1k: Number(formData.get("completionPricePer1k") || 0),
+      latencyTtftMs: Number(formData.get("latencyTtftMs") || 500),
+    });
+    setEditModelId(null);
+  }
+
   async function handleToggleModel(id: string, enabled: boolean) {
     await updateModel(id, { enabled });
   }
@@ -102,6 +143,18 @@ export function ProvidersClient({ providers }: { providers: Provider[] }) {
   async function handleDeleteModel(id: string) {
     if (!confirm("Delete this model?")) return;
     await deleteModel(id);
+  }
+
+  async function loadOpenRouterModels(providerName: string, providerId: string) {
+    setOrLoadingMap((prev) => ({ ...prev, [providerId]: true }));
+    try {
+      const models = await getOpenRouterModelsForProvider(providerName);
+      setOrModelsMap((prev) => ({ ...prev, [providerId]: models }));
+    } catch {
+      setOrModelsMap((prev) => ({ ...prev, [providerId]: [] }));
+    } finally {
+      setOrLoadingMap((prev) => ({ ...prev, [providerId]: false }));
+    }
   }
 
   return (
@@ -127,9 +180,29 @@ export function ProvidersClient({ providers }: { providers: Provider[] }) {
               className="space-y-4"
             >
               <div className="space-y-2">
-                <Label htmlFor="name">System Name</Label>
-                <Input id="name" name="name" placeholder="openai" required />
-                <p className="text-xs text-muted-foreground">Unique identifier, lowercase.</p>
+                <Label htmlFor="name">Provider</Label>
+                <select
+                  id="name"
+                  name="name"
+                  required
+                  className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+                  onChange={(e) => {
+                    const info = getProviderInfo(e.target.value);
+                    const displayInput = document.getElementById("displayName") as HTMLInputElement | null;
+                    const baseUrlInput = document.getElementById("baseUrl") as HTMLInputElement | null;
+                    if (info) {
+                      if (displayInput) displayInput.value = info.displayName;
+                      if (baseUrlInput) baseUrlInput.value = info.baseUrl;
+                    }
+                  }}
+                >
+                  <option value="">Select provider...</option>
+                  {SUPPORTED_PROVIDERS.map((p) => (
+                    <option key={p.name} value={p.name}>{p.displayName}</option>
+                  ))}
+                  <option value="custom">Other / Custom</option>
+                </select>
+                <p className="text-xs text-muted-foreground">Pick a provider to auto-fill settings.</p>
               </div>
               <div className="space-y-2">
                 <Label htmlFor="displayName">Display Name</Label>
@@ -184,6 +257,13 @@ export function ProvidersClient({ providers }: { providers: Provider[] }) {
                 <Button
                   variant="ghost"
                   size="sm"
+                  onClick={() => setEditProviderId(provider.id)}
+                >
+                  Edit
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="sm"
                   onClick={() => handleToggleProvider(provider.id, !provider.enabled)}
                 >
                   {provider.enabled ? "Disable" : "Enable"}
@@ -222,62 +302,182 @@ export function ProvidersClient({ providers }: { providers: Provider[] }) {
                         <DialogTitle>Add Model</DialogTitle>
                         <DialogDescription>Add a model to {provider.displayName}.</DialogDescription>
                       </DialogHeader>
-                      <form
-                        action={async (formData) => {
-                          await handleAddModel(provider.id, formData);
-                        }}
-                        className="space-y-4"
-                      >
-                        <div className="space-y-2">
-                          <Label htmlFor={`externalId-${provider.id}`}>Model ID</Label>
-                          <Input id={`externalId-${provider.id}`} name="externalId" placeholder="gpt-4o" required />
+                      <div className="flex items-center gap-2 mb-4">
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          onClick={() => loadOpenRouterModels(provider.name, provider.id)}
+                          disabled={orLoadingMap[provider.id]}
+                        >
+                          {orLoadingMap[provider.id] ? "Loading..." : "Load from OpenRouter"}
+                        </Button>
+                        {orModelsMap[provider.id]?.length > 0 && (
+                          <span className="text-xs text-muted-foreground">{orModelsMap[provider.id].length} models found</span>
+                        )}
+                      </div>
+                      {orModelsMap[provider.id]?.length > 0 && (
+                        <div className="mb-4">
+                          <select
+                            className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+                            value={orSelectedMap[provider.id] || ""}
+                            onChange={(e) => {
+                              setOrSelectedMap((prev) => ({ ...prev, [provider.id]: e.target.value }));
+                            }}
+                          >
+                            <option value="">Select a model to auto-fill...</option>
+                            {orModelsMap[provider.id].map((m: OpenRouterModel) => (
+                              <option key={m.id} value={m.id}>{m.name || m.id}</option>
+                            ))}
+                          </select>
                         </div>
-                        <div className="space-y-2">
-                          <Label htmlFor={`modelName-${provider.id}`}>Display Name</Label>
-                          <Input id={`modelName-${provider.id}`} name="name" placeholder="GPT-4o" required />
-                        </div>
-                        <div className="grid grid-cols-2 gap-4">
-                          <div className="space-y-2">
-                            <Label htmlFor={`contextWindow-${provider.id}`}>Context Window</Label>
-                            <Input id={`contextWindow-${provider.id}`} name="contextWindow" type="number" defaultValue={128000} />
-                          </div>
-                          <div className="space-y-2">
-                            <Label htmlFor={`maxTokens-${provider.id}`}>Max Tokens</Label>
-                            <Input id={`maxTokens-${provider.id}`} name="maxTokens" type="number" />
-                          </div>
-                        </div>
-                        <div className="space-y-2">
-                          <Label htmlFor={`capabilities-${provider.id}`}>Capabilities (comma separated)</Label>
-                          <Input id={`capabilities-${provider.id}`} name="capabilities" placeholder="chat, streaming, vision" defaultValue="chat, streaming" />
-                        </div>
-                        <div className="grid grid-cols-2 gap-4">
-                          <div className="space-y-2">
-                            <Label htmlFor={`promptPrice-${provider.id}`}>Prompt $/1K</Label>
-                            <Input id={`promptPrice-${provider.id}`} name="promptPricePer1k" type="number" step="0.0001" defaultValue={0} />
-                          </div>
-                          <div className="space-y-2">
-                            <Label htmlFor={`completionPrice-${provider.id}`}>Completion $/1K</Label>
-                            <Input id={`completionPrice-${provider.id}`} name="completionPricePer1k" type="number" step="0.0001" defaultValue={0} />
-                          </div>
-                        </div>
-                        <div className="space-y-2">
-                          <Label htmlFor={`latency-${provider.id}`}>Latency TTFT (ms)</Label>
-                          <Input id={`latency-${provider.id}`} name="latencyTtftMs" type="number" defaultValue={500} />
-                        </div>
-                        <div className="flex gap-4">
-                          <label className="flex items-center gap-2 text-sm">
-                            <input type="checkbox" name="supportsStreaming" defaultChecked />
-                            Streaming
-                          </label>
-                          <label className="flex items-center gap-2 text-sm">
-                            <input type="checkbox" name="supportsToolUse" />
-                            Tool Use
-                          </label>
-                        </div>
-                        <DialogFooter>
-                          <Button type="submit">Add Model</Button>
-                        </DialogFooter>
-                      </form>
+                      )}
+                      {(() => {
+                        const selectedModel = orModelsMap[provider.id]?.find(
+                          (m: OpenRouterModel) => m.id === orSelectedMap[provider.id]
+                        );
+                        const defaults = selectedModel
+                          ? {
+                              externalId: selectedModel.id.split("/").pop() || selectedModel.id,
+                              name: selectedModel.name || selectedModel.id,
+                              contextWindow: selectedModel.context_length || 128000,
+                              maxTokens: selectedModel.top_provider?.max_completion_tokens || undefined,
+                              capabilities: inferCapabilities(selectedModel).join(", "),
+                              promptPricePer1k: Number(selectedModel.pricing?.prompt || 0) * 1000,
+                              completionPricePer1k: Number(selectedModel.pricing?.completion || 0) * 1000,
+                              latencyTtftMs: 500,
+                              supportsStreaming: true,
+                              supportsToolUse: true,
+                            }
+                          : {
+                              externalId: "",
+                              name: "",
+                              contextWindow: 128000,
+                              maxTokens: undefined,
+                              capabilities: "chat, streaming",
+                              promptPricePer1k: 0,
+                              completionPricePer1k: 0,
+                              latencyTtftMs: 500,
+                              supportsStreaming: true,
+                              supportsToolUse: false,
+                            };
+                        return (
+                          <form
+                            key={orSelectedMap[provider.id] || "empty"}
+                            action={async (formData) => {
+                              await handleAddModel(provider.id, formData);
+                              setOrSelectedMap((prev) => {
+                                const copy = { ...prev };
+                                delete copy[provider.id];
+                                return copy;
+                              });
+                            }}
+                            className="space-y-4"
+                          >
+                            <div className="space-y-2">
+                              <Label htmlFor={`externalId-${provider.id}`}>Model ID</Label>
+                              <Input
+                                id={`externalId-${provider.id}`}
+                                name="externalId"
+                                placeholder="gpt-4o"
+                                defaultValue={defaults.externalId}
+                                required
+                              />
+                            </div>
+                            <div className="space-y-2">
+                              <Label htmlFor={`modelName-${provider.id}`}>Display Name</Label>
+                              <Input
+                                id={`modelName-${provider.id}`}
+                                name="name"
+                                placeholder="GPT-4o"
+                                defaultValue={defaults.name}
+                                required
+                              />
+                            </div>
+                            <div className="grid grid-cols-2 gap-4">
+                              <div className="space-y-2">
+                                <Label htmlFor={`contextWindow-${provider.id}`}>Context Window</Label>
+                                <Input
+                                  id={`contextWindow-${provider.id}`}
+                                  name="contextWindow"
+                                  type="number"
+                                  defaultValue={defaults.contextWindow}
+                                />
+                              </div>
+                              <div className="space-y-2">
+                                <Label htmlFor={`maxTokens-${provider.id}`}>Max Tokens</Label>
+                                <Input
+                                  id={`maxTokens-${provider.id}`}
+                                  name="maxTokens"
+                                  type="number"
+                                  defaultValue={defaults.maxTokens ?? ""}
+                                />
+                              </div>
+                            </div>
+                            <div className="space-y-2">
+                              <Label htmlFor={`capabilities-${provider.id}`}>Capabilities (comma separated)</Label>
+                              <Input
+                                id={`capabilities-${provider.id}`}
+                                name="capabilities"
+                                placeholder="chat, streaming, vision"
+                                defaultValue={defaults.capabilities}
+                              />
+                            </div>
+                            <div className="grid grid-cols-2 gap-4">
+                              <div className="space-y-2">
+                                <Label htmlFor={`promptPrice-${provider.id}`}>Prompt $/1K</Label>
+                                <Input
+                                  id={`promptPrice-${provider.id}`}
+                                  name="promptPricePer1k"
+                                  type="number"
+                                  step="0.0001"
+                                  defaultValue={defaults.promptPricePer1k}
+                                />
+                              </div>
+                              <div className="space-y-2">
+                                <Label htmlFor={`completionPrice-${provider.id}`}>Completion $/1K</Label>
+                                <Input
+                                  id={`completionPrice-${provider.id}`}
+                                  name="completionPricePer1k"
+                                  type="number"
+                                  step="0.0001"
+                                  defaultValue={defaults.completionPricePer1k}
+                                />
+                              </div>
+                            </div>
+                            <div className="space-y-2">
+                              <Label htmlFor={`latency-${provider.id}`}>Latency TTFT (ms)</Label>
+                              <Input
+                                id={`latency-${provider.id}`}
+                                name="latencyTtftMs"
+                                type="number"
+                                defaultValue={defaults.latencyTtftMs}
+                              />
+                            </div>
+                            <div className="flex gap-4">
+                              <label className="flex items-center gap-2 text-sm">
+                                <input
+                                  type="checkbox"
+                                  name="supportsStreaming"
+                                  defaultChecked={defaults.supportsStreaming}
+                                />
+                                Streaming
+                              </label>
+                              <label className="flex items-center gap-2 text-sm">
+                                <input
+                                  type="checkbox"
+                                  name="supportsToolUse"
+                                  defaultChecked={defaults.supportsToolUse}
+                                />
+                                Tool Use
+                              </label>
+                            </div>
+                            <DialogFooter>
+                              <Button type="submit">Add Model</Button>
+                            </DialogFooter>
+                          </form>
+                        );
+                      })()}
                     </DialogContent>
                   </Dialog>
                 </div>
@@ -330,6 +530,13 @@ export function ProvidersClient({ providers }: { providers: Provider[] }) {
                               <Button
                                 variant="ghost"
                                 size="sm"
+                                onClick={() => setEditModelId(model.id)}
+                              >
+                                Edit
+                              </Button>
+                              <Button
+                                variant="ghost"
+                                size="sm"
                                 onClick={() => handleToggleModel(model.id, !model.enabled)}
                               >
                                 {model.enabled ? "Disable" : "Enable"}
@@ -367,6 +574,130 @@ export function ProvidersClient({ providers }: { providers: Provider[] }) {
           </div>
         )}
       </div>
+
+      {/* Edit Provider Dialog */}
+      {(() => {
+        const provider = providers.find((p) => p.id === editProviderId);
+        if (!provider) return null;
+        return (
+          <Dialog open={!!editProviderId} onOpenChange={(v) => !v && setEditProviderId(null)}>
+            <DialogContent>
+              <DialogHeader>
+                <DialogTitle>Edit Provider</DialogTitle>
+                <DialogDescription>Update {provider.displayName} settings.</DialogDescription>
+              </DialogHeader>
+              <form
+                action={async (formData) => {
+                  await handleEditProvider(formData);
+                }}
+                className="space-y-4"
+              >
+                <div className="space-y-2">
+                  <Label htmlFor="edit-displayName">Display Name</Label>
+                  <Input id="edit-displayName" name="displayName" defaultValue={provider.displayName} required />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="edit-baseUrl">Base URL</Label>
+                  <Input id="edit-baseUrl" name="baseUrl" defaultValue={provider.baseUrl ?? ""} />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="edit-apiKey">API Key</Label>
+                  <Input id="edit-apiKey" name="apiKey" type="password" placeholder="Leave blank to keep current" />
+                </div>
+                <div className="grid grid-cols-3 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="edit-timeoutMs">Timeout (ms)</Label>
+                    <Input id="edit-timeoutMs" name="timeoutMs" type="number" defaultValue={provider.timeoutMs} />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="edit-retries">Retries</Label>
+                    <Input id="edit-retries" name="retries" type="number" defaultValue={provider.retries} />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="edit-weight">Weight</Label>
+                    <Input id="edit-weight" name="weight" type="number" defaultValue={provider.weight} />
+                  </div>
+                </div>
+                <DialogFooter>
+                  <Button type="submit">Save Provider</Button>
+                </DialogFooter>
+              </form>
+            </DialogContent>
+          </Dialog>
+        );
+      })()}
+
+      {/* Edit Model Dialog */}
+      {(() => {
+        let model: Model | null = null;
+        for (const p of providers) {
+          const found = p.models.find((m) => m.id === editModelId);
+          if (found) { model = found; break; }
+        }
+        if (!model) return null;
+        return (
+          <Dialog open={!!editModelId} onOpenChange={(v) => !v && setEditModelId(null)}>
+            <DialogContent>
+              <DialogHeader>
+                <DialogTitle>Edit Model</DialogTitle>
+                <DialogDescription>Update {model.name} settings.</DialogDescription>
+              </DialogHeader>
+              <form
+                action={async (formData) => {
+                  await handleEditModel(formData);
+                }}
+                className="space-y-4"
+              >
+                <div className="space-y-2">
+                  <Label htmlFor="edit-model-name">Display Name</Label>
+                  <Input id="edit-model-name" name="name" defaultValue={model.name} required />
+                </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="edit-model-contextWindow">Context Window</Label>
+                    <Input id="edit-model-contextWindow" name="contextWindow" type="number" defaultValue={model.contextWindow} />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="edit-model-maxTokens">Max Tokens</Label>
+                    <Input id="edit-model-maxTokens" name="maxTokens" type="number" defaultValue={model.maxTokens ?? ""} />
+                  </div>
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="edit-model-capabilities">Capabilities (comma separated)</Label>
+                  <Input id="edit-model-capabilities" name="capabilities" defaultValue={model.capabilities.join(", ")} />
+                </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="edit-model-promptPrice">Prompt $/1K</Label>
+                    <Input id="edit-model-promptPrice" name="promptPricePer1k" type="number" step="0.0001" defaultValue={model.promptPricePer1k} />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="edit-model-completionPrice">Completion $/1K</Label>
+                    <Input id="edit-model-completionPrice" name="completionPricePer1k" type="number" step="0.0001" defaultValue={model.completionPricePer1k} />
+                  </div>
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="edit-model-latency">Latency TTFT (ms)</Label>
+                  <Input id="edit-model-latency" name="latencyTtftMs" type="number" defaultValue={model.latencyTtftMs} />
+                </div>
+                <div className="flex gap-4">
+                  <label className="flex items-center gap-2 text-sm">
+                    <input type="checkbox" name="supportsStreaming" defaultChecked={model.supportsStreaming} />
+                    Streaming
+                  </label>
+                  <label className="flex items-center gap-2 text-sm">
+                    <input type="checkbox" name="supportsToolUse" defaultChecked={model.supportsToolUse} />
+                    Tool Use
+                  </label>
+                </div>
+                <DialogFooter>
+                  <Button type="submit">Save Model</Button>
+                </DialogFooter>
+              </form>
+            </DialogContent>
+          </Dialog>
+        );
+      })()}
     </div>
   );
 }

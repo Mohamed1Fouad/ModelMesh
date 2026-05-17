@@ -1,5 +1,12 @@
 import { prisma } from "@modelmesh/db";
-import type { ProviderConfig, RoutingRule } from "@modelmesh/shared";
+import type { ProviderConfig, ProviderName, RoutingRule } from "@modelmesh/shared";
+
+function isLocalProvider(name: string, baseUrl: string | null): boolean {
+  const localNames: ProviderName[] = ["ollama", "lmstudio", "localai", "vllm"];
+  if (localNames.includes(name.toLowerCase() as ProviderName)) return true;
+  if (baseUrl && /localhost|127\.0\.0\.1|host\.docker\.internal/.test(baseUrl)) return true;
+  return false;
+}
 
 export class ProviderManager {
   constructor(private db: typeof prisma) {}
@@ -56,7 +63,7 @@ export class ProviderManager {
         },
       })),
       healthCheck: {
-        enabled: true,
+        enabled: isLocalProvider(dbProvider.name, dbProvider.baseUrl),
         intervalMs: 30000,
         timeoutMs: dbProvider.timeoutMs,
       },

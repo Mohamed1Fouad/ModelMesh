@@ -92,7 +92,7 @@ describe("ProviderManager", () => {
     expect(config.models[0].id).toBe("gpt-4o");
     expect(config.models[0].pricing.promptPer1k).toBe(0.005);
     expect(config.models[0].latencyProfile.ttftMs).toBe(200);
-    expect(config.healthCheck.enabled).toBe(true);
+    expect(config.healthCheck.enabled).toBe(false);
   });
 
   it("handles undefined baseUrl and apiKey in toConfig", () => {
@@ -112,5 +112,23 @@ describe("ProviderManager", () => {
     expect(config.baseUrl).toBeUndefined();
     expect(config.apiKey).toBeUndefined();
     expect(config.models).toHaveLength(0);
+    expect(config.healthCheck.enabled).toBe(true);
+  });
+
+  it("enables health check for localhost baseUrl", () => {
+    const dbProvider = {
+      id: "p1",
+      name: "custom",
+      enabled: true,
+      baseUrl: "http://localhost:8080/v1",
+      apiKey: null,
+      timeoutMs: 30000,
+      retries: 3,
+      weight: 1,
+      models: [],
+    } as any;
+
+    const config = manager.toConfig(dbProvider);
+    expect(config.healthCheck.enabled).toBe(true);
   });
 });

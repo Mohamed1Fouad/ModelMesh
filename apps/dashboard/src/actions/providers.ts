@@ -3,6 +3,16 @@
 import { prisma } from "@modelmesh/db";
 import { revalidatePath } from "next/cache";
 
+const GATEWAY_URL = process.env.GATEWAY_URL || "http://gateway:3000";
+
+async function notifyGatewayRefresh() {
+  try {
+    await fetch(`${GATEWAY_URL}/v1/admin/refresh-providers`, { method: "POST" });
+  } catch {
+    // Silent fail — gateway may be unreachable during dev
+  }
+}
+
 export async function getProviders() {
   return prisma.provider.findMany({
     include: { models: { orderBy: { name: "asc" } } },
@@ -38,6 +48,7 @@ export async function createProvider(data: {
     },
   });
   revalidatePath("/providers");
+  await notifyGatewayRefresh();
   return provider;
 }
 
@@ -59,12 +70,14 @@ export async function updateProvider(
   });
   revalidatePath("/providers");
   revalidatePath(`/providers/${id}`);
+  await notifyGatewayRefresh();
   return provider;
 }
 
 export async function deleteProvider(id: string) {
   await prisma.provider.delete({ where: { id } });
   revalidatePath("/providers");
+  await notifyGatewayRefresh();
 }
 
 export async function createModel(data: {
@@ -98,6 +111,7 @@ export async function createModel(data: {
     },
   });
   revalidatePath("/providers");
+  await notifyGatewayRefresh();
   return model;
 }
 
@@ -121,10 +135,12 @@ export async function updateModel(
     data,
   });
   revalidatePath("/providers");
+  await notifyGatewayRefresh();
   return model;
 }
 
 export async function deleteModel(id: string) {
   await prisma.model.delete({ where: { id } });
   revalidatePath("/providers");
+  await notifyGatewayRefresh();
 }

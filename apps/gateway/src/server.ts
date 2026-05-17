@@ -64,6 +64,11 @@ setInterval(refreshProviders, 60000);
 
 fastify.get("/health", async () => ({ status: "ok", uptime: process.uptime() }));
 
+fastify.post("/v1/admin/refresh-providers", async (_request, reply) => {
+  await refreshProviders();
+  return reply.send({ refreshed: true });
+});
+
 fastify.get("/v1/models", async (_request, reply) => {
   const dbModels = await prisma.model.findMany({
     where: { enabled: true },

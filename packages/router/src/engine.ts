@@ -67,7 +67,7 @@ export class RouterEngine {
 
     if (valid.length === 0) {
       const bestDisqualified = scored
-        .filter((s) => !s.disqualified)
+        .filter((s) => s.disqualified)
         .sort((a, b) => b.score - a.score)[0];
       throw new RouterError(
         `No provider available. ${bestDisqualified?.disqualifyReason ?? "All providers disqualified."}`

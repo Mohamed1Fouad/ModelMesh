@@ -1,4 +1,5 @@
 import { getProviders } from "@/actions/providers";
+import { getOpenRouterModels } from "@/actions/openrouter";
 import { ProvidersClient } from "./providers-client";
 import { DashboardNav } from "@/components/dashboard-nav";
 
@@ -6,6 +7,7 @@ export const dynamic = "force-dynamic";
 
 export default async function ProvidersPage() {
   const providers = await getProviders();
+  const orModels = await getOpenRouterModels();
 
   return (
     <div className="min-h-screen bg-background text-foreground">
@@ -19,7 +21,7 @@ export default async function ProvidersPage() {
         <DashboardNav />
       </header>
       <main className="max-w-7xl mx-auto px-6 py-8">
-        <ProvidersClient providers={providers} />
+        <ProvidersClient providers={providers} orModels={orModels} />
       </main>
     </div>
   );

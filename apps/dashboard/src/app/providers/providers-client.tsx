@@ -14,6 +14,7 @@ import {
   DialogDescription,
   DialogFooter,
 } from "@/components/ui/dialog";
+import { CapabilitySelector } from "@/components/capability-selector";
 import {
   createProvider,
   updateProvider,
@@ -118,7 +119,7 @@ export function ProvidersClient({
       name: formData.get("name") as string,
       contextWindow: Number(formData.get("contextWindow")),
       maxTokens: Number(formData.get("maxTokens")) || undefined,
-      capabilities: (formData.get("capabilities") as string).split(",").map((c) => c.trim()),
+      capabilities: (formData.getAll("capabilities") as string[]).filter(Boolean),
       supportsStreaming: formData.get("supportsStreaming") === "on",
       supportsToolUse: formData.get("supportsToolUse") === "on",
       promptPricePer1k: Number(formData.get("promptPricePer1k") || 0),
@@ -134,7 +135,7 @@ export function ProvidersClient({
       name: formData.get("name") as string,
       contextWindow: Number(formData.get("contextWindow")),
       maxTokens: Number(formData.get("maxTokens")) || undefined,
-      capabilities: (formData.get("capabilities") as string).split(",").map((c) => c.trim()),
+      capabilities: (formData.getAll("capabilities") as string[]).filter(Boolean),
       supportsStreaming: formData.get("supportsStreaming") === "on",
       supportsToolUse: formData.get("supportsToolUse") === "on",
       promptPricePer1k: Number(formData.get("promptPricePer1k") || 0),
@@ -309,7 +310,7 @@ export function ProvidersClient({
                               name: selectedModel.name || selectedModel.id,
                               contextWindow: selectedModel.context_length || 128000,
                               maxTokens: selectedModel.top_provider?.max_completion_tokens || undefined,
-                              capabilities: inferCapabilities(selectedModel).join(", "),
+                              capabilities: inferCapabilities(selectedModel),
                               promptPricePer1k: Number(selectedModel.pricing?.prompt || 0) * 1000,
                               completionPricePer1k: Number(selectedModel.pricing?.completion || 0) * 1000,
                               latencyTtftMs: 500,
@@ -321,7 +322,7 @@ export function ProvidersClient({
                               name: "",
                               contextWindow: 128000,
                               maxTokens: undefined,
-                              capabilities: "chat, streaming",
+                              capabilities: ["chat", "streaming"],
                               promptPricePer1k: 0,
                               completionPricePer1k: 0,
                               latencyTtftMs: 500,
@@ -399,15 +400,10 @@ export function ProvidersClient({
                                   />
                                 </div>
                               </div>
-                              <div className="space-y-2">
-                                <Label htmlFor={`capabilities-${provider.id}`}>Capabilities (comma separated)</Label>
-                                <Input
-                                  id={`capabilities-${provider.id}`}
-                                  name="capabilities"
-                                  placeholder="chat, streaming, vision"
-                                  defaultValue={defaults.capabilities}
-                                />
-                              </div>
+                              <CapabilitySelector
+                                name="capabilities"
+                                defaultValue={defaults.capabilities}
+                              />
                               <div className="grid grid-cols-2 gap-4">
                                 <div className="space-y-2">
                                   <Label htmlFor={`promptPrice-${provider.id}`}>Prompt $/1K</Label>
@@ -648,10 +644,10 @@ export function ProvidersClient({
                     <Input id="edit-model-maxTokens" name="maxTokens" type="number" defaultValue={model.maxTokens ?? ""} />
                   </div>
                 </div>
-                <div className="space-y-2">
-                  <Label htmlFor="edit-model-capabilities">Capabilities (comma separated)</Label>
-                  <Input id="edit-model-capabilities" name="capabilities" defaultValue={model.capabilities.join(", ")} />
-                </div>
+                <CapabilitySelector
+                  name="capabilities"
+                  defaultValue={model.capabilities}
+                />
                 <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-2">
                     <Label htmlFor="edit-model-promptPrice">Prompt $/1K</Label>

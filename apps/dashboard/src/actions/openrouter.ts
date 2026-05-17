@@ -6,7 +6,7 @@ import type { OpenRouterModel } from "@/lib/openrouter";
 
 const CACHE_DIR = join(process.cwd(), ".cache");
 const CACHE_FILE = join(CACHE_DIR, "openrouter-models.json");
-const CACHE_TTL_MS = 60 * 60 * 1000;
+const CACHE_TTL_MS = 7 * 24 * 60 * 60 * 1000;
 
 interface CacheEntry {
   models: OpenRouterModel[];

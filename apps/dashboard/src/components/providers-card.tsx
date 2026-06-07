@@ -1,43 +1,8 @@
-"use client";
-
-import { useEffect, useState } from "react";
+import { getProviders } from "@/actions/providers";
 import { Badge } from "@/components/ui/badge";
 
-interface Provider {
-  id: string;
-  name: string;
-  displayName: string;
-  enabled: boolean;
-  _count?: { models: number };
-}
-
-export function ProvidersCard() {
-  const [providers, setProviders] = useState<Provider[]>([]);
-
-  useEffect(() => {
-    fetch("/api/models")
-      .then((r) => r.json())
-      .then((data) => {
-        if (data?.data) {
-          // Extract unique providers from models list
-          const providerMap = new Map<string, Provider>();
-          data.data.forEach((m: { id: string; owned_by: string }) => {
-            const parts = m.id.split("/");
-            const name = parts[0] || m.owned_by;
-            if (!providerMap.has(name)) {
-              providerMap.set(name, {
-                id: name,
-                name,
-                displayName: m.owned_by || name,
-                enabled: true,
-              });
-            }
-          });
-          setProviders(Array.from(providerMap.values()));
-        }
-      })
-      .catch(() => setProviders([]));
-  }, []);
+export async function ProvidersCard() {
+  const providers = await getProviders();
 
   return (
     <div className="rounded-xl border border-border bg-card p-5 space-y-4">
@@ -58,7 +23,7 @@ export function ProvidersCard() {
                   {p.enabled ? "Active" : "Inactive"}
                 </Badge>
               </div>
-              <p className="text-xs text-muted-foreground">{p.name}</p>
+              <p className="text-xs text-muted-foreground">{p.models.length} models · {p.name}</p>
             </div>
           ))}
         </div>

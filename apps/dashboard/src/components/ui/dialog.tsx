@@ -44,11 +44,11 @@ export function DialogContent({ children, className }: { children: ReactNode; cl
   if (!ctx.open) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center" onClick={() => ctx.setOpen(false)}>
+    <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto py-10" onClick={() => ctx.setOpen(false)}>
       <div className="fixed inset-0 bg-black/50" />
       <div
         className={cn(
-          "relative z-50 w-full max-w-lg rounded-lg border border-border bg-card p-6 shadow-lg",
+          "relative z-50 w-full max-w-lg rounded-lg border border-border bg-card p-6 shadow-lg max-h-[85vh] overflow-y-auto",
           className
         )}
         onClick={(e) => e.stopPropagation()}

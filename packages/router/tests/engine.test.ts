@@ -791,6 +791,91 @@ describe("RouterEngine", () => {
     expect(result.selectedProvider).toBe("openai");
   });
 
+  it("routes to explicitly requested model", async () => {
+    const engine = new RouterEngine({
+      rules: [],
+      providers: [
+        makeProvider({
+          name: "openai",
+          models: [makeModel({ id: "gpt-4", capabilities: ["code"] })],
+        }),
+        makeProvider({
+          name: "anthropic",
+          models: [makeModel({ id: "claude", capabilities: ["chat"] })],
+        }),
+      ],
+      localFirst: false,
+      budgetAware: false,
+      fallbackEnabled: false,
+      healthAware: false,
+    });
+
+    const result = await engine.route(makeRequest({ model: "gpt-4" }));
+    expect(result.selectedProvider).toBe("openai");
+    expect(result.selectedModel).toBe("gpt-4");
+  });
+
+  it("skips capability filter when explicit model is requested", async () => {
+    const engine = new RouterEngine({
+      rules: [],
+      providers: [
+        makeProvider({
+          name: "openai",
+          models: [makeModel({ id: "gpt-4", capabilities: ["code"] })],
+        }),
+      ],
+      localFirst: false,
+      budgetAware: false,
+      fallbackEnabled: false,
+      healthAware: false,
+    });
+
+    const result = await engine.route(
+      makeRequest({ model: "gpt-4", requiredCapabilities: ["chat"] })
+    );
+    expect(result.selectedProvider).toBe("openai");
+    expect(result.selectedModel).toBe("gpt-4");
+  });
+
+  it("throws RouterError when explicit model does not exist", async () => {
+    const engine = new RouterEngine({
+      rules: [],
+      providers: [
+        makeProvider({
+          name: "openai",
+          models: [makeModel({ id: "gpt-4o" })],
+        }),
+      ],
+      localFirst: false,
+      budgetAware: false,
+      fallbackEnabled: false,
+      healthAware: false,
+    });
+
+    await expect(
+      engine.route(makeRequest({ model: "gpt-5.5-pro" }))
+    ).rejects.toThrow(RouterError);
+  });
+
+  it("applies capability filter when model is auto", async () => {
+    const engine = new RouterEngine({
+      rules: [],
+      providers: [
+        makeProvider({
+          name: "openai",
+          models: [makeModel({ id: "gpt-4o", capabilities: ["chat"] })],
+        }),
+      ],
+      localFirst: false,
+      budgetAware: false,
+      fallbackEnabled: false,
+      healthAware: false,
+    });
+
+    const result = await engine.route(makeRequest({ model: "auto" }));
+    expect(result.selectedProvider).toBe("openai");
+  });
+
   it("skips disabled providers", async () => {
     const engine = new RouterEngine({
       rules: [],

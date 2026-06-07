@@ -51,7 +51,9 @@ export async function getOpenRouterModels(): Promise<OpenRouterModel[]> {
   if (cached) return cached.models;
 
   const models = await fetchModels();
-  writeCache({ models, fetchedAt: Date.now() });
+  if (models.length > 0) {
+    writeCache({ models, fetchedAt: Date.now() });
+  }
   return models;
 }
 

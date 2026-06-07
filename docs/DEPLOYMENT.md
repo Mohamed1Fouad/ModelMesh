@@ -24,6 +24,7 @@ pnpm dev
 
 Seed data includes:
 - OpenAI, Anthropic, and Ollama providers with models
+- **ProviderModelCatalog** — verified canonical definitions for 29+ models with correct native `externalId`s, prices, and capabilities
 - 4 routing rules (code → Claude, privacy → local, cheap → Ollama, reasoning → Opus)
 - 3 agents (Researcher, Writer, Coder) with tools
 - 1 workflow (Research & Write)

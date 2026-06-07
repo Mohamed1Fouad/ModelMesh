@@ -14,6 +14,8 @@ interface UsageStats {
     requests: number;
     cost: number;
     tokens: number;
+    monthlyCost: number;
+    monthlyQuotaCost: number | null;
   }>;
   byTaskType: Array<{
     taskType: string;
@@ -28,6 +30,8 @@ interface UsageStats {
     requests: number;
     cost: number;
     tokens: number;
+    monthlyCost: number;
+    monthlyQuotaCost: number | null;
   }>;
 }
 
@@ -93,26 +97,47 @@ export function UsageClient({ stats, recent }: { stats: UsageStats; recent: Usag
         <div className="rounded-xl border border-border bg-card p-5 space-y-4">
           <h3 className="font-semibold tracking-tight">By Provider</h3>
           <div className="space-y-3">
-            {stats.byProvider.map((p) => (
-              <div key={p.providerId} className="flex items-center justify-between">
-                <div className="flex items-center gap-3">
-                  <div className="w-32 font-medium text-sm">{p.providerName}</div>
-                  <div className="flex-1 h-2 bg-muted rounded-full overflow-hidden">
-                    <div
-                      className="h-full bg-primary rounded-full"
-                      style={{
-                        width: `${
-                          stats.totalCost > 0 ? (p.cost / stats.totalCost) * 100 : 0
-                        }%`,
-                      }}
-                    />
+            {stats.byProvider.map((p) => {
+              const pct = p.monthlyQuotaCost && p.monthlyQuotaCost > 0
+                ? Math.min((p.monthlyCost / p.monthlyQuotaCost) * 100, 100)
+                : null;
+              const barColor = pct === null ? "bg-primary" : pct >= 100 ? "bg-red-500" : pct >= 80 ? "bg-amber-500" : "bg-emerald-500";
+              return (
+                <div key={p.providerId} className="space-y-1">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-3 flex-1">
+                      <div className="w-32 font-medium text-sm">{p.providerName}</div>
+                      <div className="flex-1 h-2 bg-muted rounded-full overflow-hidden">
+                        <div
+                          className={`h-full ${barColor} rounded-full`}
+                          style={{
+                            width: `${
+                              stats.totalCost > 0 ? (p.cost / stats.totalCost) * 100 : 0
+                            }%`,
+                          }}
+                        />
+                      </div>
+                    </div>
+                    <div className="text-sm text-muted-foreground ml-3">
+                      {p.requests.toLocaleString()} reqs · ${p.cost.toFixed(4)}
+                    </div>
                   </div>
+                  {p.monthlyQuotaCost !== null && (
+                    <div className="flex items-center gap-2 text-xs">
+                      <div className="flex-1 h-1.5 bg-muted rounded-full overflow-hidden ml-[140px]">
+                        <div
+                          className={`h-full ${barColor} rounded-full`}
+                          style={{ width: `${pct}%` }}
+                        />
+                      </div>
+                      <span className={`${pct! >= 100 ? "text-red-500" : pct! >= 80 ? "text-amber-500" : "text-emerald-500"} whitespace-nowrap`}>
+                        ${p.monthlyCost.toFixed(2)} / ${p.monthlyQuotaCost.toFixed(2)} ({pct!.toFixed(0)}%)
+                      </span>
+                    </div>
+                  )}
                 </div>
-                <div className="text-sm text-muted-foreground">
-                  {p.requests.toLocaleString()} reqs · ${p.cost.toFixed(4)}
-                </div>
-              </div>
-            ))}
+              );
+            })}
             {stats.byProvider.length === 0 && (
               <p className="text-sm text-muted-foreground">No provider usage data yet.</p>
             )}
@@ -122,26 +147,47 @@ export function UsageClient({ stats, recent }: { stats: UsageStats; recent: Usag
         <div className="rounded-xl border border-border bg-card p-5 space-y-4">
           <h3 className="font-semibold tracking-tight">By Model</h3>
           <div className="space-y-3">
-            {stats.byModel.map((m) => (
-              <div key={m.modelId} className="flex items-center justify-between">
-                <div className="flex items-center gap-3">
-                  <div className="w-32 font-medium text-sm truncate" title={m.modelName}>{m.modelName}</div>
-                  <div className="flex-1 h-2 bg-muted rounded-full overflow-hidden">
-                    <div
-                      className="h-full bg-emerald-500 rounded-full"
-                      style={{
-                        width: `${
-                          stats.totalCost > 0 ? (m.cost / stats.totalCost) * 100 : 0
-                        }%`,
-                      }}
-                    />
+            {stats.byModel.map((m) => {
+              const pct = m.monthlyQuotaCost && m.monthlyQuotaCost > 0
+                ? Math.min((m.monthlyCost / m.monthlyQuotaCost) * 100, 100)
+                : null;
+              const barColor = pct === null ? "bg-emerald-500" : pct >= 100 ? "bg-red-500" : pct >= 80 ? "bg-amber-500" : "bg-emerald-500";
+              return (
+                <div key={m.modelId} className="space-y-1">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-3 flex-1">
+                      <div className="w-32 font-medium text-sm truncate" title={m.modelName}>{m.modelName}</div>
+                      <div className="flex-1 h-2 bg-muted rounded-full overflow-hidden">
+                        <div
+                          className={`h-full ${barColor} rounded-full`}
+                          style={{
+                            width: `${
+                              stats.totalCost > 0 ? (m.cost / stats.totalCost) * 100 : 0
+                            }%`,
+                          }}
+                        />
+                      </div>
+                    </div>
+                    <div className="text-sm text-muted-foreground ml-3">
+                      {m.requests.toLocaleString()} reqs · ${m.cost.toFixed(4)}
+                    </div>
                   </div>
+                  {m.monthlyQuotaCost !== null && (
+                    <div className="flex items-center gap-2 text-xs">
+                      <div className="flex-1 h-1.5 bg-muted rounded-full overflow-hidden ml-[140px]">
+                        <div
+                          className={`h-full ${barColor} rounded-full`}
+                          style={{ width: `${pct}%` }}
+                        />
+                      </div>
+                      <span className={`${pct! >= 100 ? "text-red-500" : pct! >= 80 ? "text-amber-500" : "text-emerald-500"} whitespace-nowrap`}>
+                        ${m.monthlyCost.toFixed(2)} / ${m.monthlyQuotaCost.toFixed(2)} ({pct!.toFixed(0)}%)
+                      </span>
+                    </div>
+                  )}
                 </div>
-                <div className="text-sm text-muted-foreground">
-                  {m.requests.toLocaleString()} reqs · ${m.cost.toFixed(4)}
-                </div>
-              </div>
-            ))}
+              );
+            })}
             {stats.byModel.length === 0 && (
               <p className="text-sm text-muted-foreground">No model usage data yet.</p>
             )}

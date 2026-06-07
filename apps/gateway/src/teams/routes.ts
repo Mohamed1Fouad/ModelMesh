@@ -5,12 +5,13 @@ import { authMiddleware, teamContextMiddleware, requirePermission } from "../aut
 import type { AuthenticatedRequest } from "../auth/middleware.js";
 
 export async function registerTeamRoutes(fastify: FastifyInstance) {
-  // Apply auth middleware to all team routes
-  fastify.addHook("onRequest", authMiddleware);
-  fastify.addHook("onRequest", teamContextMiddleware);
+  await fastify.register(async (scoped) => {
+    // Apply auth middleware to all team routes
+    scoped.addHook("onRequest", authMiddleware);
+    scoped.addHook("onRequest", teamContextMiddleware);
 
   // List teams for current user
-  fastify.get("/v1/teams", async (request: AuthenticatedRequest, reply: FastifyReply) => {
+  scoped.get("/v1/teams", async (request: AuthenticatedRequest, reply: FastifyReply) => {
     if (!request.user) return reply.status(401).send({ error: { message: "Authentication required", type: "authentication_error" } });
 
     const memberships = await prisma.teamMember.findMany({
@@ -32,7 +33,7 @@ export async function registerTeamRoutes(fastify: FastifyInstance) {
   });
 
   // Get single team
-  fastify.get("/v1/teams/:id", { preHandler: requirePermission("team:read") }, async (request: AuthenticatedRequest, reply: FastifyReply) => {
+  scoped.get("/v1/teams/:id", { preHandler: requirePermission("team:read") }, async (request: AuthenticatedRequest, reply: FastifyReply) => {
     const { id } = request.params as Record<string, string>;
     const team = await prisma.team.findUnique({
       where: { id },
@@ -72,7 +73,7 @@ export async function registerTeamRoutes(fastify: FastifyInstance) {
   });
 
   // Create team
-  fastify.post("/v1/teams", async (request: AuthenticatedRequest, reply: FastifyReply) => {
+  scoped.post("/v1/teams", async (request: AuthenticatedRequest, reply: FastifyReply) => {
     if (!request.user) return reply.status(401).send({ error: { message: "Authentication required", type: "authentication_error" } });
     const body = request.body as Record<string, unknown>;
     const name = String(body.name ?? "");
@@ -86,14 +87,17 @@ export async function registerTeamRoutes(fastify: FastifyInstance) {
     const existing = await prisma.team.findUnique({ where: { slug } });
     if (existing) return reply.status(409).send({ error: { message: "Team slug already exists", type: "conflict" } });
 
+    // Only auto-add member if the user exists in the User table (not API-key auth)
+    const userExists = request.user.id !== "api-key" && request.user.id !== "anonymous"
+      ? await prisma.user.findUnique({ where: { id: request.user.id } })
+      : null;
+
     const team = await prisma.team.create({
       data: {
         name,
         slug,
         description,
-        members: {
-          create: { userId: request.user.id, role: "owner" },
-        },
+        ...(userExists ? { members: { create: { userId: request.user.id, role: "owner" } } } : {}),
       },
     });
 
@@ -101,7 +105,7 @@ export async function registerTeamRoutes(fastify: FastifyInstance) {
   });
 
   // Update team
-  fastify.put("/v1/teams/:id", { preHandler: requirePermission("team:write") }, async (request: AuthenticatedRequest, reply: FastifyReply) => {
+  scoped.put("/v1/teams/:id", { preHandler: requirePermission("team:write") }, async (request: AuthenticatedRequest, reply: FastifyReply) => {
     const { id } = request.params as Record<string, string>;
     const body = request.body as Record<string, unknown>;
     const team = await prisma.team.update({
@@ -116,14 +120,14 @@ export async function registerTeamRoutes(fastify: FastifyInstance) {
   });
 
   // Delete team
-  fastify.delete("/v1/teams/:id", { preHandler: requirePermission("team:write") }, async (request: AuthenticatedRequest, reply: FastifyReply) => {
+  scoped.delete("/v1/teams/:id", { preHandler: requirePermission("team:write") }, async (request: AuthenticatedRequest, reply: FastifyReply) => {
     const { id } = request.params as Record<string, string>;
     await prisma.team.delete({ where: { id } });
     return reply.status(204).send();
   });
 
   // Invite member
-  fastify.post("/v1/teams/:id/invitations", { preHandler: requirePermission("team:write") }, async (request: AuthenticatedRequest, reply: FastifyReply) => {
+  scoped.post("/v1/teams/:id/invitations", { preHandler: requirePermission("team:write") }, async (request: AuthenticatedRequest, reply: FastifyReply) => {
     const { id } = request.params as Record<string, string>;
     const body = request.body as Record<string, unknown>;
     const email = String(body.email ?? "");
@@ -142,7 +146,7 @@ export async function registerTeamRoutes(fastify: FastifyInstance) {
   });
 
   // List invitations
-  fastify.get("/v1/teams/:id/invitations", { preHandler: requirePermission("team:read") }, async (request: AuthenticatedRequest, reply: FastifyReply) => {
+  scoped.get("/v1/teams/:id/invitations", { preHandler: requirePermission("team:read") }, async (request: AuthenticatedRequest, reply: FastifyReply) => {
     const { id } = request.params as Record<string, string>;
     const invitations = await prisma.teamInvitation.findMany({
       where: { teamId: id, accepted: false, expiresAt: { gt: new Date() } },
@@ -151,7 +155,7 @@ export async function registerTeamRoutes(fastify: FastifyInstance) {
   });
 
   // Accept invitation
-  fastify.post("/v1/invitations/:token/accept", async (request: AuthenticatedRequest, reply: FastifyReply) => {
+  scoped.post("/v1/invitations/:token/accept", async (request: AuthenticatedRequest, reply: FastifyReply) => {
     if (!request.user) return reply.status(401).send({ error: { message: "Authentication required", type: "authentication_error" } });
     const { token } = request.params as Record<string, string>;
 
@@ -171,7 +175,7 @@ export async function registerTeamRoutes(fastify: FastifyInstance) {
   });
 
   // Update member role
-  fastify.put("/v1/teams/:id/members/:memberId", { preHandler: requirePermission("team:write") }, async (request: AuthenticatedRequest, reply: FastifyReply) => {
+  scoped.put("/v1/teams/:id/members/:memberId", { preHandler: requirePermission("team:write") }, async (request: AuthenticatedRequest, reply: FastifyReply) => {
     const { memberId } = request.params as Record<string, string>;
     const body = request.body as Record<string, unknown>;
     const role = String(body.role ?? "developer");
@@ -185,14 +189,14 @@ export async function registerTeamRoutes(fastify: FastifyInstance) {
   });
 
   // Remove member
-  fastify.delete("/v1/teams/:id/members/:memberId", { preHandler: requirePermission("team:write") }, async (request: AuthenticatedRequest, reply: FastifyReply) => {
+  scoped.delete("/v1/teams/:id/members/:memberId", { preHandler: requirePermission("team:write") }, async (request: AuthenticatedRequest, reply: FastifyReply) => {
     const { memberId } = request.params as Record<string, string>;
     await prisma.teamMember.delete({ where: { id: memberId } });
     return reply.status(204).send();
   });
 
   // Update team provider settings
-  fastify.put("/v1/teams/:id/providers/:providerId", { preHandler: requirePermission("team:write") }, async (request: AuthenticatedRequest, reply: FastifyReply) => {
+  scoped.put("/v1/teams/:id/providers/:providerId", { preHandler: requirePermission("team:write") }, async (request: AuthenticatedRequest, reply: FastifyReply) => {
     const { id, providerId } = request.params as Record<string, string>;
     const body = request.body as Record<string, unknown>;
 
@@ -215,5 +219,6 @@ export async function registerTeamRoutes(fastify: FastifyInstance) {
     });
 
     return reply.send(tp);
+  });
   });
 }

@@ -17,6 +17,7 @@ model Provider {
   timeoutMs   Int      @default(30000)
   retries     Int      @default(3)
   weight      Int      @default(1)
+  monthlyQuotaCost Float?
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
@@ -33,6 +34,7 @@ model Model {
   id            String   @id @default(cuid())
   providerId    String
   externalId    String
+  openRouterId  String?
   name          String
   contextWindow Int
   maxTokens     Int?
@@ -45,6 +47,7 @@ model Model {
   latencyTtftMs Int      @default(500)
   latencyThroughputTokensPerSec Int @default(50)
   latencyScore  Int      @default(50)
+  monthlyQuotaCost Float?
   enabled       Boolean  @default(true)
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
@@ -297,7 +300,36 @@ model MarketplacePreset {
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
 
+  @@unique([name, providerName])
   @@map("marketplace_presets")
+}
+
+// Internal catalog of supported providers and their native model IDs.
+// Maintained manually and updated per release. Used to auto-fill
+// correct externalId + openRouterId when users add models in the dashboard.
+model ProviderModelCatalog {
+  id            String   @id @default(cuid())
+  providerName  String
+  externalId    String
+  openRouterId  String?
+  name          String
+  description   String?
+  contextWindow Int
+  maxTokens     Int?
+  capabilities  String[]
+  supportsStreaming Boolean @default(true)
+  supportsToolUse   Boolean @default(false)
+  promptPricePer1k  Float  @default(0)
+  completionPricePer1k Float @default(0)
+  latencyTtftMs Int      @default(500)
+  latencyThroughputTokensPerSec Int @default(50)
+  tags          String[]
+  enabled       Boolean  @default(true)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  @@unique([providerName, externalId])
+  @@map("provider_model_catalog")
 }
 
 model Agent {

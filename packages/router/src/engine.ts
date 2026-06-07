@@ -121,9 +121,19 @@ export class RouterEngine {
   }
 
   private scoreCandidates(candidates: ScoredProvider[], request: RoutingRequest): ScoredProvider[] {
+    const explicitModel = request.model && request.model !== "auto" ? request.model : null;
+
     for (const candidate of candidates) {
-      this.applyCapabilityFilter(candidate, request.requiredCapabilities);
-      if (candidate.disqualified) continue;
+      if (explicitModel && candidate.model.id !== explicitModel) {
+        candidate.disqualified = true;
+        candidate.disqualifyReason = `Model mismatch: requested ${explicitModel}`;
+        continue;
+      }
+
+      if (!explicitModel) {
+        this.applyCapabilityFilter(candidate, request.requiredCapabilities);
+        if (candidate.disqualified) continue;
+      }
 
       this.applyContextWindowFilter(candidate, request);
       if (candidate.disqualified) continue;

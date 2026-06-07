@@ -87,6 +87,7 @@ describe("providers actions", () => {
     await createModel({
       providerId: "p1",
       externalId: "gpt-4o",
+      openRouterId: "openai/gpt-4o",
       name: "GPT-4o",
       contextWindow: 128000,
       capabilities: ["chat"],
@@ -95,6 +96,7 @@ describe("providers actions", () => {
       data: {
         providerId: "p1",
         externalId: "gpt-4o",
+        openRouterId: "openai/gpt-4o",
         name: "GPT-4o",
         contextWindow: 128000,
         maxTokens: undefined,

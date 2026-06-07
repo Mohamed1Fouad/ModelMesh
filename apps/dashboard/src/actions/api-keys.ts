@@ -37,6 +37,31 @@ export async function createApiKey(data: {
   return { rawKey, keyPrefix };
 }
 
+export async function getOrCreateDashboardApiKey(): Promise<string> {
+  const name = "Dashboard Chat";
+  const existing = await prisma.apiKey.findFirst({ where: { name } });
+  if (existing) {
+    // Return a regenerated key since we can't recover the original
+    // For simplicity, delete the old one and create a new one
+    await prisma.apiKey.delete({ where: { id: existing.id } });
+  }
+
+  const rawKey = `mm-dash-${randomBytes(32).toString("hex")}`;
+  const keyHash = createHash("sha256").update(rawKey).digest("hex");
+  const keyPrefix = rawKey.slice(0, 8);
+
+  await prisma.apiKey.create({
+    data: {
+      name,
+      keyHash,
+      keyPrefix,
+      scopes: ["chat:write"],
+    },
+  });
+
+  return rawKey;
+}
+
 export async function revokeApiKey(id: string) {
   await prisma.apiKey.delete({ where: { id } });
   revalidatePath("/api-keys");

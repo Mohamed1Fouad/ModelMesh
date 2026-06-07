@@ -35,7 +35,7 @@ export class OpenAIAdapter implements ProviderAdapter {
         "Accept": "text/event-stream",
         ...config.defaultHeaders,
       },
-      body: JSON.stringify({ ...body, model: targetModel, stream: true }),
+      body: JSON.stringify({ ...body, model: targetModel, stream: true, stream_options: { include_usage: true } }),
     });
 
     if (!response.ok || !response.body) {

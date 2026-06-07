@@ -1,3 +1,4 @@
+import { prisma } from "@modelmesh/db";
 import { getRoutingRules } from "@/actions/routing-rules";
 import { RoutingClient } from "./routing-client";
 import { DashboardNav } from "@/components/dashboard-nav";
@@ -5,7 +6,14 @@ import { DashboardNav } from "@/components/dashboard-nav";
 export const dynamic = "force-dynamic";
 
 export default async function RoutingPage() {
-  const rawRules = await getRoutingRules();
+  const [rawRules, models] = await Promise.all([
+    getRoutingRules(),
+    prisma.model.findMany({
+      where: { enabled: true },
+      select: { externalId: true, name: true, provider: { select: { name: true } } },
+      orderBy: { name: "asc" },
+    }),
+  ]);
   const rules = rawRules.map((r: typeof rawRules[number]) => ({
     ...r,
     condition: r.condition as Record<string, unknown>,
@@ -24,7 +32,7 @@ export default async function RoutingPage() {
         <DashboardNav />
       </header>
       <main className="max-w-7xl mx-auto px-6 py-8">
-        <RoutingClient rules={rules} />
+        <RoutingClient rules={rules} models={models} />
       </main>
     </div>
   );

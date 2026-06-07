@@ -64,7 +64,7 @@ services:
       HEALTH_CHECK_INTERVAL_MS: "30000"
       HEALTH_CHECK_TIMEOUT_MS: "10000"
       HEALTH_FAILURE_THRESHOLD: "3"
-      CORS_ORIGIN: ${CORS_ORIGIN:-http://localhost:3001}
+      CORS_ORIGIN: ${CORS_ORIGIN:-*}
     ports:
       - "3000:3000"
     depends_on:

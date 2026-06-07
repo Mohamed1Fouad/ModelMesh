@@ -75,6 +75,22 @@ describe("routing-rules actions", () => {
     });
   });
 
+  it("createRoutingRule accepts model in route_to action", async () => {
+    vi.mocked(prisma.routingRule.create).mockResolvedValue({ id: "r2" } as any);
+    await createRoutingRule({
+      name: "ModelRoute",
+      priority: 10,
+      condition: { type: "task_type", taskType: "coding" },
+      action: { type: "route_to", provider: "openai", model: "gpt-4o" },
+    });
+    expect(prisma.routingRule.create).toHaveBeenCalledWith({
+      data: expect.objectContaining({
+        name: "ModelRoute",
+        action: { type: "route_to", provider: "openai", model: "gpt-4o" },
+      }),
+    });
+  });
+
   it("deleteRoutingRule removes and revalidates", async () => {
     vi.mocked(prisma.routingRule.delete).mockResolvedValue({} as any);
     await deleteRoutingRule("r1");

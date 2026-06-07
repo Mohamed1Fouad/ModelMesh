@@ -36,7 +36,9 @@ describe("usage actions", () => {
     vi.mocked(prisma.usageLog.groupBy)
       .mockResolvedValueOnce([{ providerId: "p1", _count: 50, _sum: { cost: 0.8, totalTokens: 400 } }] as any)
       .mockResolvedValueOnce([{ taskType: "chat", _count: 80, _sum: { cost: 1.0, totalTokens: 600 } }] as any)
-      .mockResolvedValueOnce([{ modelId: "m1", _count: 60, _sum: { cost: 0.9, totalTokens: 500 } }] as any);
+      .mockResolvedValueOnce([{ modelId: "m1", _count: 60, _sum: { cost: 0.9, totalTokens: 500 } }] as any)
+      .mockResolvedValueOnce([{ providerId: "p1", _sum: { cost: 0.8 } }] as any)
+      .mockResolvedValueOnce([{ modelId: "m1", _sum: { cost: 0.9 } }] as any);
     vi.mocked(prisma.provider.findMany).mockResolvedValue([{ id: "p1", displayName: "OpenAI" }] as any);
     vi.mocked(prisma.model.findMany).mockResolvedValue([{ id: "m1", name: "GPT-4o", providerId: "p1" }] as any);
 

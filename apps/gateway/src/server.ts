@@ -2,6 +2,7 @@ import "dotenv/config";
 import Fastify from "fastify";
 import cors from "@fastify/cors";
 import { v4 as uuidv4 } from "uuid";
+import { randomBytes, createHash } from "crypto";
 import { RouterEngine, HealthMonitor } from "@modelmesh/router";
 import { prisma } from "@modelmesh/db";
 import type {
@@ -47,6 +48,19 @@ const healthMonitor = new HealthMonitor({
   failureThreshold: Number(process.env.HEALTH_FAILURE_THRESHOLD ?? "3"),
   onStatusChange: (provider, prev, curr) => {
     fastify.log.warn(`Provider ${provider} health changed: ${prev} -> ${curr}`);
+    prisma.provider.findUnique({ where: { name: provider } }).then((p: { id: string } | null) => {
+      if (p) {
+        prisma.healthLog.create({
+          data: {
+            providerId: p.id,
+            status: curr,
+            latencyMs: 0,
+            errorRate: curr === "unhealthy" ? 1 : 0,
+            successRate: curr === "healthy" ? 1 : 0,
+          },
+        }).catch(() => {});
+      }
+    }).catch(() => {});
   },
 });
 
@@ -69,6 +83,128 @@ fastify.post("/v1/admin/refresh-providers", async (_request, reply) => {
   return reply.send({ refreshed: true });
 });
 
+// Admin provider CRUD
+fastify.get("/v1/admin/providers", { preHandler: [authMiddleware, requirePermission("provider:read")] }, async (_request, reply) => {
+  const providers = await prisma.provider.findMany({ include: { models: true }, orderBy: { name: "asc" } });
+  return reply.send({ data: providers });
+});
+
+fastify.post("/v1/admin/providers", { preHandler: [authMiddleware, requirePermission("provider:write")] }, async (request, reply) => {
+  const body = request.body as Record<string, unknown>;
+  const provider = await prisma.provider.create({
+    data: {
+      name: String(body.name),
+      displayName: String(body.displayName),
+      baseUrl: body.baseUrl ? String(body.baseUrl) : null,
+      apiKey: body.apiKey ? String(body.apiKey) : null,
+      timeoutMs: Number(body.timeoutMs ?? 30000),
+      retries: Number(body.retries ?? 3),
+      weight: Number(body.weight ?? 1),
+      enabled: body.enabled !== false,
+    },
+  });
+  await refreshProviders();
+  return reply.status(201).send(provider);
+});
+
+fastify.put("/v1/admin/providers/:id", { preHandler: [authMiddleware, requirePermission("provider:write")] }, async (request, reply) => {
+  const { id } = request.params as { id: string };
+  const body = request.body as Record<string, unknown>;
+  const data: Record<string, unknown> = {};
+  if (body.displayName !== undefined) data.displayName = String(body.displayName);
+  if (body.baseUrl !== undefined) data.baseUrl = body.baseUrl ? String(body.baseUrl) : null;
+  if (body.apiKey !== undefined) data.apiKey = body.apiKey ? String(body.apiKey) : null;
+  if (body.timeoutMs !== undefined) data.timeoutMs = Number(body.timeoutMs);
+  if (body.retries !== undefined) data.retries = Number(body.retries);
+  if (body.weight !== undefined) data.weight = Number(body.weight);
+  if (body.enabled !== undefined) data.enabled = Boolean(body.enabled);
+  if (body.monthlyQuotaCost !== undefined) data.monthlyQuotaCost = body.monthlyQuotaCost === null ? null : Number(body.monthlyQuotaCost);
+  const provider = await prisma.provider.update({ where: { id }, data });
+  await refreshProviders();
+  return reply.send(provider);
+});
+
+fastify.delete("/v1/admin/providers/:id", { preHandler: [authMiddleware, requirePermission("provider:write")] }, async (request, reply) => {
+  const { id } = request.params as { id: string };
+  await prisma.provider.delete({ where: { id } });
+  await refreshProviders();
+  return reply.status(204).send();
+});
+
+// Get single provider
+fastify.get("/v1/admin/providers/:id", { preHandler: [authMiddleware, requirePermission("provider:read")] }, async (request, reply) => {
+  const { id } = request.params as { id: string };
+  const provider = await prisma.provider.findUnique({ where: { id }, include: { models: true } });
+  if (!provider) return reply.status(404).send({ error: { message: "Provider not found", type: "not_found" } });
+  return reply.send(provider);
+});
+
+// Admin model CRUD
+fastify.get("/v1/admin/models", { preHandler: [authMiddleware, requirePermission("provider:read")] }, async (_request, reply) => {
+  const models = await prisma.model.findMany({ include: { provider: true }, orderBy: { name: "asc" } });
+  return reply.send({ data: models });
+});
+
+fastify.post("/v1/admin/models", { preHandler: [authMiddleware, requirePermission("provider:write")] }, async (request, reply) => {
+  const body = request.body as Record<string, unknown>;
+  const model = await prisma.model.create({
+    data: {
+      providerId: String(body.providerId),
+      externalId: String(body.externalId),
+      openRouterId: body.openRouterId ? String(body.openRouterId) : null,
+      name: String(body.name),
+      contextWindow: Number(body.contextWindow ?? 128000),
+      maxTokens: body.maxTokens ? Number(body.maxTokens) : null,
+      capabilities: Array.isArray(body.capabilities) ? (body.capabilities as string[]) : ["chat", "streaming"],
+      supportsStreaming: body.supportsStreaming !== false,
+      supportsToolUse: body.supportsToolUse === true,
+      promptPricePer1k: Number(body.promptPricePer1k ?? 0),
+      completionPricePer1k: Number(body.completionPricePer1k ?? 0),
+      latencyTtftMs: Number(body.latencyTtftMs ?? 500),
+      enabled: body.enabled !== false,
+    },
+  });
+  await refreshProviders();
+  return reply.status(201).send(model);
+});
+
+fastify.put("/v1/admin/models/:id", { preHandler: [authMiddleware, requirePermission("provider:write")] }, async (request, reply) => {
+  const { id } = request.params as { id: string };
+  const body = request.body as Record<string, unknown>;
+  const data: Record<string, unknown> = {};
+  if (body.name !== undefined) data.name = String(body.name);
+  if (body.externalId !== undefined) data.externalId = String(body.externalId);
+  if (body.openRouterId !== undefined) data.openRouterId = body.openRouterId ? String(body.openRouterId) : null;
+  if (body.contextWindow !== undefined) data.contextWindow = Number(body.contextWindow);
+  if (body.maxTokens !== undefined) data.maxTokens = body.maxTokens ? Number(body.maxTokens) : null;
+  if (body.capabilities !== undefined) data.capabilities = Array.isArray(body.capabilities) ? body.capabilities : ["chat", "streaming"];
+  if (body.supportsStreaming !== undefined) data.supportsStreaming = Boolean(body.supportsStreaming);
+  if (body.supportsToolUse !== undefined) data.supportsToolUse = Boolean(body.supportsToolUse);
+  if (body.promptPricePer1k !== undefined) data.promptPricePer1k = Number(body.promptPricePer1k);
+  if (body.completionPricePer1k !== undefined) data.completionPricePer1k = Number(body.completionPricePer1k);
+  if (body.latencyTtftMs !== undefined) data.latencyTtftMs = Number(body.latencyTtftMs);
+  if (body.enabled !== undefined) data.enabled = Boolean(body.enabled);
+  if (body.monthlyQuotaCost !== undefined) data.monthlyQuotaCost = body.monthlyQuotaCost === null ? null : Number(body.monthlyQuotaCost);
+  const model = await prisma.model.update({ where: { id }, data });
+  await refreshProviders();
+  return reply.send(model);
+});
+
+fastify.delete("/v1/admin/models/:id", { preHandler: [authMiddleware, requirePermission("provider:write")] }, async (request, reply) => {
+  const { id } = request.params as { id: string };
+  await prisma.model.delete({ where: { id } });
+  await refreshProviders();
+  return reply.status(204).send();
+});
+
+// Get single model
+fastify.get("/v1/admin/models/:id", { preHandler: [authMiddleware, requirePermission("provider:read")] }, async (request, reply) => {
+  const { id } = request.params as { id: string };
+  const model = await prisma.model.findUnique({ where: { id }, include: { provider: true } });
+  if (!model) return reply.status(404).send({ error: { message: "Model not found", type: "not_found" } });
+  return reply.send(model);
+});
+
 fastify.get("/v1/models", async (_request, reply) => {
   const dbModels = await prisma.model.findMany({
     where: { enabled: true },
@@ -86,6 +222,105 @@ fastify.get("/v1/models", async (_request, reply) => {
   }));
 
   return reply.send({ object: "list", data: models });
+});
+
+// Admin routing rules CRUD
+fastify.get("/v1/admin/rules", { preHandler: [authMiddleware, requirePermission("provider:read")] }, async (_request, reply) => {
+  const rules = await prisma.routingRule.findMany({
+    orderBy: [{ priority: "desc" }, { createdAt: "desc" }],
+  });
+  return reply.send({ data: rules });
+});
+
+fastify.post("/v1/admin/rules", { preHandler: [authMiddleware, requirePermission("provider:write")] }, async (request, reply) => {
+  const body = request.body as Record<string, unknown>;
+  const rule = await prisma.routingRule.create({
+    data: {
+      name: String(body.name),
+      priority: Number(body.priority ?? 0),
+      condition: body.condition as object,
+      action: body.action as object,
+      enabled: body.enabled !== false,
+    },
+  });
+  await refreshProviders();
+  return reply.status(201).send(rule);
+});
+
+fastify.put("/v1/admin/rules/:id", { preHandler: [authMiddleware, requirePermission("provider:write")] }, async (request, reply) => {
+  const { id } = request.params as { id: string };
+  const body = request.body as Record<string, unknown>;
+  const data: Record<string, unknown> = {};
+  if (body.name !== undefined) data.name = String(body.name);
+  if (body.priority !== undefined) data.priority = Number(body.priority);
+  if (body.enabled !== undefined) data.enabled = Boolean(body.enabled);
+  if (body.condition !== undefined) data.condition = body.condition as object;
+  if (body.action !== undefined) data.action = body.action as object;
+  const rule = await prisma.routingRule.update({ where: { id }, data });
+  await refreshProviders();
+  return reply.send(rule);
+});
+
+fastify.delete("/v1/admin/rules/:id", { preHandler: [authMiddleware, requirePermission("provider:write")] }, async (request, reply) => {
+  const { id } = request.params as { id: string };
+  await prisma.routingRule.delete({ where: { id } });
+  await refreshProviders();
+  return reply.status(204).send();
+});
+
+// Get single rule
+fastify.get("/v1/admin/rules/:id", { preHandler: [authMiddleware, requirePermission("provider:read")] }, async (request, reply) => {
+  const { id } = request.params as { id: string };
+  const rule = await prisma.routingRule.findUnique({ where: { id } });
+  if (!rule) return reply.status(404).send({ error: { message: "Rule not found", type: "not_found" } });
+  return reply.send(rule);
+});
+
+// Admin API keys CRUD
+fastify.get("/v1/admin/api-keys", { preHandler: [authMiddleware, requirePermission("provider:read")] }, async (_request, reply) => {
+  const keys = await prisma.apiKey.findMany({
+    orderBy: { createdAt: "desc" },
+    select: { id: true, name: true, keyPrefix: true, scopes: true, rateLimitRpm: true, rateLimitTpm: true, expiresAt: true, lastUsedAt: true, usageCount: true, createdAt: true },
+  });
+  return reply.send({ data: keys });
+});
+
+fastify.post("/v1/admin/api-keys", { preHandler: [authMiddleware, requirePermission("provider:write")] }, async (request, reply) => {
+  const body = request.body as Record<string, unknown>;
+  const rawKey = `mm-${randomBytes(32).toString("hex")}`;
+  const keyHash = createHash("sha256").update(rawKey).digest("hex");
+  const keyPrefix = rawKey.slice(0, 8);
+  const key = await prisma.apiKey.create({
+    data: {
+      name: String(body.name),
+      keyHash,
+      keyPrefix,
+      scopes: Array.isArray(body.scopes) ? (body.scopes as string[]) : ["chat:write"],
+      rateLimitRpm: body.rateLimitRpm ? Number(body.rateLimitRpm) : null,
+      rateLimitTpm: body.rateLimitTpm ? Number(body.rateLimitTpm) : null,
+      expiresAt: body.expiresAt ? new Date(String(body.expiresAt)) : null,
+    },
+  });
+  return reply.status(201).send({ id: key.id, name: key.name, key: rawKey, keyPrefix, scopes: key.scopes, createdAt: key.createdAt });
+});
+
+fastify.delete("/v1/admin/api-keys/:id", { preHandler: [authMiddleware, requirePermission("provider:write")] }, async (request, reply) => {
+  const { id } = request.params as { id: string };
+  await prisma.apiKey.delete({ where: { id } });
+  return reply.status(204).send();
+});
+
+// Provider model catalog
+fastify.get("/v1/admin/catalog", { preHandler: [authMiddleware, requirePermission("provider:read")] }, async (request, reply) => {
+  const query = request.query as Record<string, string>;
+  const catalog = await prisma.providerModelCatalog.findMany({
+    where: {
+      enabled: true,
+      ...(query.provider ? { providerName: query.provider.toLowerCase() } : {}),
+    },
+    orderBy: { name: "asc" },
+  });
+  return reply.send({ data: catalog });
 });
 
 fastify.post("/v1/chat/completions", async (request, reply) => {
@@ -136,13 +371,13 @@ fastify.post("/v1/chat/completions", async (request, reply) => {
 
   try {
     if (body.stream) {
+      const stream = await adapter.chatCompletionStream(body, providerConfig, route.selectedModel);
       reply.raw.writeHead(200, {
         "Content-Type": "text/event-stream",
         "Cache-Control": "no-cache",
         "Connection": "keep-alive",
       });
 
-      const stream = await adapter.chatCompletionStream(body, providerConfig, route.selectedModel);
       for await (const chunk of streamTransformer(stream, route.selectedModel, reqId)) {
         if (chunk.usage) {
           promptTokens = chunk.usage.prompt_tokens;
@@ -164,6 +399,12 @@ fastify.post("/v1/chat/completions", async (request, reply) => {
     errorMessage = err instanceof Error ? err.message : String(err);
     fastify.log.error(`[${reqId}] Provider error: ${errorMessage}`);
 
+    if (reply.raw.headersSent) {
+      reply.raw.write(`data: ${JSON.stringify({ error: { message: errorMessage, type: "provider_error", code: "streaming_failed" } })}\n\n`);
+      reply.raw.end();
+      return;
+    }
+
     if (engine["options"].fallbackEnabled && route.alternatives.length > 0) {
       const fallback = route.alternatives[0];
       fastify.log.info(`[${reqId}] Fallback to ${fallback.provider}/${fallback.model}`);
@@ -171,6 +412,25 @@ fastify.post("/v1/chat/completions", async (request, reply) => {
       const fallbackConfig = engine["options"].providers.find((p: { name: string }) => p.name === fallback.provider);
       if (fallbackConfig) {
         try {
+          if (body.stream) {
+            const fbStream = await fallbackAdapter.chatCompletionStream(body, fallbackConfig, fallback.model);
+            reply.raw.writeHead(200, {
+              "Content-Type": "text/event-stream",
+              "Cache-Control": "no-cache",
+              "Connection": "keep-alive",
+            });
+            for await (const chunk of streamTransformer(fbStream, fallback.model, reqId)) {
+              if (chunk.usage) {
+                promptTokens = chunk.usage.prompt_tokens;
+                completionTokens = chunk.usage.completion_tokens;
+              }
+              reply.raw.write(`data: ${JSON.stringify(chunk)}\n\n`);
+            }
+            reply.raw.write("data: [DONE]\n\n");
+            reply.raw.end();
+            status = "success";
+            return;
+          }
           const fbResponse = await fallbackAdapter.chatCompletion(body, fallbackConfig, fallback.model);
           promptTokens = fbResponse.usage?.prompt_tokens ?? 0;
           completionTokens = fbResponse.usage?.completion_tokens ?? 0;
@@ -182,9 +442,13 @@ fastify.post("/v1/chat/completions", async (request, reply) => {
       }
     }
 
+    const finalMessage = route.alternatives.length > 0
+      ? `Primary provider failed (${route.selectedProvider}/${route.selectedModel}), fallback to ${route.alternatives[0].provider}/${route.alternatives[0].model} also failed: ${errorMessage}`
+      : errorMessage;
+
     return reply.status(502).send({
       error: {
-        message: errorMessage,
+        message: finalMessage,
         type: "provider_error",
         code: "routing_failed",
       },

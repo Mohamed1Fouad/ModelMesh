@@ -81,6 +81,7 @@ describe("authMiddleware", () => {
       email: "prod-key",
       name: "prod-key",
       role: "api_key",
+      teamRole: "api_key",
     });
     expect(prisma.apiKey.findUnique).toHaveBeenCalledWith({ where: { keyHash: hashKey("sk-test") } });
     expect(prisma.apiKey.update).toHaveBeenCalled();

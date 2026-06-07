@@ -6,13 +6,14 @@ import { cn } from "@/lib/utils";
 
 const nav = [
   { href: "/", label: "Dashboard" },
+  { href: "/chat", label: "Chat" },
   { href: "/providers", label: "Providers" },
   { href: "/routing", label: "Routing" },
   { href: "/usage", label: "Usage" },
   { href: "/api-keys", label: "API Keys" },
   // { href: "/teams", label: "Teams" },
   // { href: "/marketplace", label: "Marketplace" },
-  { href: "/audit-logs", label: "Audit" },
+  { href: "/audit-logs", label: "Logs" },
 ];
 
 export function DashboardNav() {

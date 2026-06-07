@@ -50,6 +50,22 @@ describe("api-keys actions", () => {
     });
   });
 
+  it("createApiKey accepts custom scopes array", async () => {
+    vi.mocked(prisma.apiKey.create).mockResolvedValue({ id: "k1" } as any);
+    await createApiKey({ name: "Scoped", scopes: ["chat:write", "models:read", "usage:read"] });
+    expect(prisma.apiKey.create).toHaveBeenCalledWith({
+      data: expect.objectContaining({ name: "Scoped", scopes: ["chat:write", "models:read", "usage:read"] }),
+    });
+  });
+
+  it("createApiKey defaults to chat:write scope when none provided", async () => {
+    vi.mocked(prisma.apiKey.create).mockResolvedValue({ id: "k1" } as any);
+    await createApiKey({ name: "Default" });
+    expect(prisma.apiKey.create).toHaveBeenCalledWith({
+      data: expect.objectContaining({ name: "Default", scopes: ["chat:write"] }),
+    });
+  });
+
   it("revokeApiKey deletes and revalidates", async () => {
     vi.mocked(prisma.apiKey.delete).mockResolvedValue({} as any);
     await revokeApiKey("k1");

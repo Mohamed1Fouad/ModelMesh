@@ -33,10 +33,34 @@ export function ApiKeysClient({ keys }: { keys: ApiKey[] }) {
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [newKey, setNewKey] = useState<{ rawKey: string; keyPrefix: string } | null>(null);
 
+  const AVAILABLE_SCOPES = [
+    "chat:write",
+    "models:read",
+    "provider:read",
+    "provider:write",
+    "rule:read",
+    "rule:write",
+    "usage:read",
+    "agent:read",
+    "agent:write",
+    "workflow:read",
+    "workflow:write",
+    "marketplace:read",
+    "marketplace:write",
+    "audit:read",
+    "team:read",
+    "team:write",
+    "key:read",
+    "key:write",
+  ];
+
   async function handleCreate(formData: FormData) {
+    const selectedScopes = AVAILABLE_SCOPES.filter(
+      (scope) => formData.get(`scope_${scope}`) === "on"
+    );
     const result = await createApiKey({
       name: formData.get("name") as string,
-      scopes: (formData.get("scopes") as string).split(",").map((s) => s.trim()),
+      scopes: selectedScopes.length > 0 ? selectedScopes : ["chat:write"],
       rateLimitRpm: Number(formData.get("rateLimitRpm")) || undefined,
       rateLimitTpm: Number(formData.get("rateLimitTpm")) || undefined,
       expiresAt: (formData.get("expiresAt") as string)
@@ -79,8 +103,20 @@ export function ApiKeysClient({ keys }: { keys: ApiKey[] }) {
                 <Input id="keyName" name="name" placeholder="Production App" required />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="scopes">Scopes (comma separated)</Label>
-                <Input id="scopes" name="scopes" defaultValue="chat:write, models:read" />
+                <Label>Scopes</Label>
+                <div className="grid grid-cols-2 gap-2 rounded-lg border border-border bg-background p-3">
+                  {AVAILABLE_SCOPES.map((scope) => (
+                    <label key={scope} className="flex items-center gap-2 text-sm">
+                      <input
+                        type="checkbox"
+                        name={`scope_${scope}`}
+                        defaultChecked={["chat:write", "models:read"].includes(scope)}
+                        className="rounded border-border"
+                      />
+                      {scope}
+                    </label>
+                  ))}
+                </div>
               </div>
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">

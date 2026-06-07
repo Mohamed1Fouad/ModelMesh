@@ -26,9 +26,7 @@ import {
 import {
   SUPPORTED_PROVIDERS,
   getProviderInfo,
-  inferCapabilities,
 } from "@/lib/openrouter";
-import type { OpenRouterModel } from "@/lib/openrouter";
 
 interface Provider {
   id: string;
@@ -40,12 +38,14 @@ interface Provider {
   timeoutMs: number;
   retries: number;
   weight: number;
+  monthlyQuotaCost: number | null;
   models: Model[];
 }
 
 interface Model {
   id: string;
   externalId: string;
+  openRouterId: string | null;
   name: string;
   enabled: boolean;
   contextWindow: number;
@@ -56,25 +56,43 @@ interface Model {
   promptPricePer1k: number;
   completionPricePer1k: number;
   latencyTtftMs: number;
+  monthlyQuotaCost: number | null;
+}
+
+interface CatalogEntry {
+  id: string;
+  providerName: string;
+  externalId: string;
+  openRouterId: string | null;
+  name: string;
+  description: string | null;
+  contextWindow: number;
+  maxTokens: number | null;
+  capabilities: string[];
+  supportsStreaming: boolean;
+  supportsToolUse: boolean;
+  promptPricePer1k: number;
+  completionPricePer1k: number;
+  latencyTtftMs: number;
+  tags: string[];
 }
 
 export function ProvidersClient({
   providers,
-  orModels,
+  catalog,
 }: {
   providers: Provider[];
-  orModels: OpenRouterModel[];
+  catalog: CatalogEntry[];
 }) {
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [expandedProvider, setExpandedProvider] = useState<string | null>(null);
   const [isAddModelOpen, setIsAddModelOpen] = useState<string | null>(null);
   const [editProviderId, setEditProviderId] = useState<string | null>(null);
   const [editModelId, setEditModelId] = useState<string | null>(null);
-  const [orSelectedMap, setOrSelectedMap] = useState<Record<string, string>>({});
+  const [catalogSelectedMap, setCatalogSelectedMap] = useState<Record<string, string>>({});
 
-  function getOrModelsForProvider(providerName: string) {
-    const prefix = `${providerName.toLowerCase()}/`;
-    return orModels.filter((m) => m.id.toLowerCase().startsWith(prefix));
+  function getCatalogForProvider(providerName: string) {
+    return catalog.filter((m) => m.providerName.toLowerCase() === providerName.toLowerCase());
   }
 
   async function handleCreate(formData: FormData) {
@@ -86,6 +104,7 @@ export function ProvidersClient({
       timeoutMs: Number(formData.get("timeoutMs") || 30000),
       retries: Number(formData.get("retries") || 3),
       weight: Number(formData.get("weight") || 1),
+      monthlyQuotaCost: formData.get("monthlyQuotaCost") ? Number(formData.get("monthlyQuotaCost")) : undefined,
     });
     setIsCreateOpen(false);
   }
@@ -99,6 +118,7 @@ export function ProvidersClient({
       timeoutMs: Number(formData.get("timeoutMs") || 30000),
       retries: Number(formData.get("retries") || 3),
       weight: Number(formData.get("weight") || 1),
+      monthlyQuotaCost: formData.get("monthlyQuotaCost") ? Number(formData.get("monthlyQuotaCost")) : null,
     });
     setEditProviderId(null);
   }
@@ -116,15 +136,17 @@ export function ProvidersClient({
     await createModel({
       providerId,
       externalId: formData.get("externalId") as string,
+      openRouterId: (formData.get("openRouterId") as string) || undefined,
       name: formData.get("name") as string,
       contextWindow: Number(formData.get("contextWindow")),
       maxTokens: Number(formData.get("maxTokens")) || undefined,
       capabilities: (formData.getAll("capabilities") as string[]).filter(Boolean),
       supportsStreaming: formData.get("supportsStreaming") === "on",
       supportsToolUse: formData.get("supportsToolUse") === "on",
-      promptPricePer1k: Number(formData.get("promptPricePer1k") || 0),
-      completionPricePer1k: Number(formData.get("completionPricePer1k") || 0),
+      promptPricePer1k: Number(formData.get("promptPricePer1k") || 0) / 1000,
+      completionPricePer1k: Number(formData.get("completionPricePer1k") || 0) / 1000,
       latencyTtftMs: Number(formData.get("latencyTtftMs") || 500),
+      monthlyQuotaCost: formData.get("monthlyQuotaCost") ? Number(formData.get("monthlyQuotaCost")) : undefined,
     });
     setIsAddModelOpen(null);
   }
@@ -133,14 +155,17 @@ export function ProvidersClient({
     if (!editModelId) return;
     await updateModel(editModelId, {
       name: formData.get("name") as string,
+      externalId: formData.get("externalId") as string,
+      openRouterId: (formData.get("openRouterId") as string) || null,
       contextWindow: Number(formData.get("contextWindow")),
       maxTokens: Number(formData.get("maxTokens")) || undefined,
       capabilities: (formData.getAll("capabilities") as string[]).filter(Boolean),
       supportsStreaming: formData.get("supportsStreaming") === "on",
       supportsToolUse: formData.get("supportsToolUse") === "on",
-      promptPricePer1k: Number(formData.get("promptPricePer1k") || 0),
-      completionPricePer1k: Number(formData.get("completionPricePer1k") || 0),
+      promptPricePer1k: Number(formData.get("promptPricePer1k") || 0) / 1000,
+      completionPricePer1k: Number(formData.get("completionPricePer1k") || 0) / 1000,
       latencyTtftMs: Number(formData.get("latencyTtftMs") || 500),
+      monthlyQuotaCost: formData.get("monthlyQuotaCost") ? Number(formData.get("monthlyQuotaCost")) : null,
     });
     setEditModelId(null);
   }
@@ -227,6 +252,10 @@ export function ProvidersClient({
                   <Input id="weight" name="weight" type="number" defaultValue={1} />
                 </div>
               </div>
+              <div className="space-y-2">
+                <Label htmlFor="monthlyQuotaCost">Monthly Quota ($)</Label>
+                <Input id="monthlyQuotaCost" name="monthlyQuotaCost" type="number" step="0.01" placeholder="Leave blank for no limit" />
+              </div>
               <DialogFooter>
                 <Button type="submit">Create Provider</Button>
               </DialogFooter>
@@ -294,31 +323,33 @@ export function ProvidersClient({
                     <DialogTrigger asChild>
                       <Button size="sm">Add Model</Button>
                     </DialogTrigger>
-                    <DialogContent>
+                    <DialogContent className="max-w-5xl">
                       <DialogHeader>
                         <DialogTitle>Add Model</DialogTitle>
                         <DialogDescription>Add a model to {provider.displayName}.</DialogDescription>
                       </DialogHeader>
                       {(() => {
-                        const providerModels = getOrModelsForProvider(provider.name);
+                        const providerModels = getCatalogForProvider(provider.name);
                         const selectedModel = providerModels.find(
-                          (m) => m.id === orSelectedMap[provider.id]
+                          (m) => m.id === catalogSelectedMap[provider.id]
                         );
                         const defaults = selectedModel
                           ? {
-                              externalId: selectedModel.id.split("/").pop() || selectedModel.id,
-                              name: selectedModel.name || selectedModel.id,
-                              contextWindow: selectedModel.context_length || 128000,
-                              maxTokens: selectedModel.top_provider?.max_completion_tokens || undefined,
-                              capabilities: inferCapabilities(selectedModel),
-                              promptPricePer1k: Number(selectedModel.pricing?.prompt || 0) * 1000,
-                              completionPricePer1k: Number(selectedModel.pricing?.completion || 0) * 1000,
-                              latencyTtftMs: 500,
-                              supportsStreaming: true,
-                              supportsToolUse: true,
+                              externalId: selectedModel.externalId,
+                              openRouterId: selectedModel.openRouterId || "",
+                              name: selectedModel.name,
+                              contextWindow: selectedModel.contextWindow,
+                              maxTokens: selectedModel.maxTokens ?? undefined,
+                              capabilities: selectedModel.capabilities,
+                              promptPricePer1k: selectedModel.promptPricePer1k * 1000,
+                              completionPricePer1k: selectedModel.completionPricePer1k * 1000,
+                              latencyTtftMs: selectedModel.latencyTtftMs,
+                              supportsStreaming: selectedModel.supportsStreaming,
+                              supportsToolUse: selectedModel.supportsToolUse,
                             }
                           : {
                               externalId: "",
+                              openRouterId: "",
                               name: "",
                               contextWindow: 128000,
                               maxTokens: undefined,
@@ -331,28 +362,34 @@ export function ProvidersClient({
                             };
                         return (
                           <>
-                            {providerModels.length > 0 && (
-                              <div className="mb-4">
+                            {providerModels.length > 0 ? (
+                              <div className="mb-4 space-y-1">
+                                <Label htmlFor={`catalog-model-${provider.id}`}>Auto-fill from Catalog</Label>
                                 <select
+                                  id={`catalog-model-${provider.id}`}
                                   className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
-                                  value={orSelectedMap[provider.id] || ""}
+                                  value={catalogSelectedMap[provider.id] || ""}
                                   onChange={(e) => {
-                                    setOrSelectedMap((prev) => ({ ...prev, [provider.id]: e.target.value }));
+                                    setCatalogSelectedMap((prev) => ({ ...prev, [provider.id]: e.target.value }));
                                   }}
                                 >
                                   <option value="">Select a model to auto-fill...</option>
-                                  {providerModels.map((m: OpenRouterModel) => (
-                                    <option key={m.id} value={m.id}>{m.name || m.id}</option>
+                                  {providerModels.map((m) => (
+                                    <option key={m.id} value={m.id}>{m.name}</option>
                                   ))}
                                 </select>
-                                <p className="text-xs text-muted-foreground mt-1">{providerModels.length} models available from OpenRouter</p>
+                                <p className="text-xs text-muted-foreground">{providerModels.length} models in catalog for {provider.displayName}</p>
+                              </div>
+                            ) : (
+                              <div className="mb-4 rounded-md border border-border bg-muted px-3 py-2 text-sm text-muted-foreground">
+                                No catalog models for <strong>{provider.name}</strong>. Enter the model details manually below.
                               </div>
                             )}
                             <form
-                              key={orSelectedMap[provider.id] || "empty"}
+                              key={catalogSelectedMap[provider.id] || "empty"}
                               action={async (formData) => {
                                 await handleAddModel(provider.id, formData);
-                                setOrSelectedMap((prev) => {
+                                setCatalogSelectedMap((prev) => {
                                   const copy = { ...prev };
                                   delete copy[provider.id];
                                   return copy;
@@ -360,26 +397,30 @@ export function ProvidersClient({
                               }}
                               className="space-y-4"
                             >
-                              <div className="space-y-2">
-                                <Label htmlFor={`externalId-${provider.id}`}>Model ID</Label>
-                                <Input
-                                  id={`externalId-${provider.id}`}
-                                  name="externalId"
-                                  placeholder="gpt-4o"
-                                  defaultValue={defaults.externalId}
-                                  required
-                                />
+                              <div className="grid grid-cols-2 gap-4">
+                                <div className="space-y-2">
+                                  <Label htmlFor={`externalId-${provider.id}`}>Model ID</Label>
+                                  <Input
+                                    id={`externalId-${provider.id}`}
+                                    name="externalId"
+                                    placeholder="gpt-4o"
+                                    defaultValue={defaults.externalId}
+                                    required
+                                  />
+                                  <p className="text-xs text-muted-foreground">Native provider ID sent to the API.</p>
+                                </div>
+                                <div className="space-y-2">
+                                  <Label htmlFor={`modelName-${provider.id}`}>Display Name</Label>
+                                  <Input
+                                    id={`modelName-${provider.id}`}
+                                    name="name"
+                                    placeholder="GPT-4o"
+                                    defaultValue={defaults.name}
+                                    required
+                                  />
+                                </div>
                               </div>
-                              <div className="space-y-2">
-                                <Label htmlFor={`modelName-${provider.id}`}>Display Name</Label>
-                                <Input
-                                  id={`modelName-${provider.id}`}
-                                  name="name"
-                                  placeholder="GPT-4o"
-                                  defaultValue={defaults.name}
-                                  required
-                                />
-                              </div>
+                              <input type="hidden" name="openRouterId" value={defaults.openRouterId} />
                               <div className="grid grid-cols-2 gap-4">
                                 <div className="space-y-2">
                                   <Label htmlFor={`contextWindow-${provider.id}`}>Context Window</Label>
@@ -406,52 +447,64 @@ export function ProvidersClient({
                               />
                               <div className="grid grid-cols-2 gap-4">
                                 <div className="space-y-2">
-                                  <Label htmlFor={`promptPrice-${provider.id}`}>Prompt $/1K</Label>
+                                  <Label htmlFor={`promptPrice-${provider.id}`}>Input $/1M</Label>
                                   <Input
                                     id={`promptPrice-${provider.id}`}
                                     name="promptPricePer1k"
                                     type="number"
-                                    step="0.0001"
+                                    step="0.01"
                                     defaultValue={defaults.promptPricePer1k}
                                   />
                                 </div>
                                 <div className="space-y-2">
-                                  <Label htmlFor={`completionPrice-${provider.id}`}>Completion $/1K</Label>
+                                  <Label htmlFor={`completionPrice-${provider.id}`}>Output $/1M</Label>
                                   <Input
                                     id={`completionPrice-${provider.id}`}
                                     name="completionPricePer1k"
                                     type="number"
-                                    step="0.0001"
+                                    step="0.01"
                                     defaultValue={defaults.completionPricePer1k}
                                   />
                                 </div>
                               </div>
-                              <div className="space-y-2">
-                                <Label htmlFor={`latency-${provider.id}`}>Latency TTFT (ms)</Label>
-                                <Input
-                                  id={`latency-${provider.id}`}
-                                  name="latencyTtftMs"
-                                  type="number"
-                                  defaultValue={defaults.latencyTtftMs}
-                                />
+                              <div className="grid grid-cols-2 gap-4">
+                                <div className="space-y-2">
+                                  <Label htmlFor={`latency-${provider.id}`}>Latency TTFT (ms)</Label>
+                                  <Input
+                                    id={`latency-${provider.id}`}
+                                    name="latencyTtftMs"
+                                    type="number"
+                                    defaultValue={defaults.latencyTtftMs}
+                                  />
+                                </div>
+                                <div className="flex items-end gap-4 pb-2">
+                                  <label className="flex items-center gap-2 text-sm">
+                                    <input
+                                      type="checkbox"
+                                      name="supportsStreaming"
+                                      defaultChecked={defaults.supportsStreaming}
+                                    />
+                                    Streaming
+                                  </label>
+                                  <label className="flex items-center gap-2 text-sm">
+                                    <input
+                                      type="checkbox"
+                                      name="supportsToolUse"
+                                      defaultChecked={defaults.supportsToolUse}
+                                    />
+                                    Tool Use
+                                  </label>
+                                </div>
                               </div>
-                              <div className="flex gap-4">
-                                <label className="flex items-center gap-2 text-sm">
-                                  <input
-                                    type="checkbox"
-                                    name="supportsStreaming"
-                                    defaultChecked={defaults.supportsStreaming}
-                                  />
-                                  Streaming
-                                </label>
-                                <label className="flex items-center gap-2 text-sm">
-                                  <input
-                                    type="checkbox"
-                                    name="supportsToolUse"
-                                    defaultChecked={defaults.supportsToolUse}
-                                  />
-                                  Tool Use
-                                </label>
+                              <div className="space-y-2">
+                                <Label htmlFor={`monthlyQuotaCost-${provider.id}`}>Monthly Quota ($)</Label>
+                                <Input
+                                  id={`monthlyQuotaCost-${provider.id}`}
+                                  name="monthlyQuotaCost"
+                                  type="number"
+                                  step="0.01"
+                                  placeholder="Leave blank for no limit"
+                                />
                               </div>
                               <DialogFooter>
                                 <Button type="submit">Add Model</Button>
@@ -470,7 +523,7 @@ export function ProvidersClient({
                       <tr>
                         <th className="px-4 py-2 text-left font-medium">Model</th>
                         <th className="px-4 py-2 text-left font-medium">Context</th>
-                        <th className="px-4 py-2 text-left font-medium">Price ($/1K)</th>
+                        <th className="px-4 py-2 text-left font-medium">Price ($/1M)</th>
                         <th className="px-4 py-2 text-left font-medium">Capabilities</th>
                         <th className="px-4 py-2 text-left font-medium">Status</th>
                         <th className="px-4 py-2 text-right font-medium">Actions</th>
@@ -488,9 +541,9 @@ export function ProvidersClient({
                           </td>
                           <td className="px-4 py-3">
                             <div className="text-xs">
-                              Prompt: ${model.promptPricePer1k.toFixed(4)}
+                              Input: ${(model.promptPricePer1k * 1000).toFixed(2)}/1M
                               <br />
-                              Completion: ${model.completionPricePer1k.toFixed(4)}
+                              Output: ${(model.completionPricePer1k * 1000).toFixed(2)}/1M
                             </div>
                           </td>
                           <td className="px-4 py-3">
@@ -600,6 +653,10 @@ export function ProvidersClient({
                     <Input id="edit-weight" name="weight" type="number" defaultValue={provider.weight} />
                   </div>
                 </div>
+                <div className="space-y-2">
+                  <Label htmlFor="edit-monthlyQuotaCost">Monthly Quota ($)</Label>
+                  <Input id="edit-monthlyQuotaCost" name="monthlyQuotaCost" type="number" step="0.01" defaultValue={provider.monthlyQuotaCost ?? ""} placeholder="Leave blank for no limit" />
+                </div>
                 <DialogFooter>
                   <Button type="submit">Save Provider</Button>
                 </DialogFooter>
@@ -619,7 +676,7 @@ export function ProvidersClient({
         if (!model) return null;
         return (
           <Dialog open={!!editModelId} onOpenChange={(v) => !v && setEditModelId(null)}>
-            <DialogContent>
+            <DialogContent className="max-w-5xl">
               <DialogHeader>
                 <DialogTitle>Edit Model</DialogTitle>
                 <DialogDescription>Update {model.name} settings.</DialogDescription>
@@ -630,10 +687,17 @@ export function ProvidersClient({
                 }}
                 className="space-y-4"
               >
-                <div className="space-y-2">
-                  <Label htmlFor="edit-model-name">Display Name</Label>
-                  <Input id="edit-model-name" name="name" defaultValue={model.name} required />
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="edit-model-name">Display Name</Label>
+                    <Input id="edit-model-name" name="name" defaultValue={model.name} required />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="edit-model-externalId">Model ID</Label>
+                    <Input id="edit-model-externalId" name="externalId" defaultValue={model.externalId} required />
+                  </div>
                 </div>
+                <input type="hidden" name="openRouterId" value={model.openRouterId ?? ""} />
                 <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-2">
                     <Label htmlFor="edit-model-contextWindow">Context Window</Label>
@@ -650,27 +714,33 @@ export function ProvidersClient({
                 />
                 <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-2">
-                    <Label htmlFor="edit-model-promptPrice">Prompt $/1K</Label>
-                    <Input id="edit-model-promptPrice" name="promptPricePer1k" type="number" step="0.0001" defaultValue={model.promptPricePer1k} />
+                    <Label htmlFor="edit-model-promptPrice">Input $/1M</Label>
+                    <Input id="edit-model-promptPrice" name="promptPricePer1k" type="number" step="0.01" defaultValue={model.promptPricePer1k * 1000} />
                   </div>
                   <div className="space-y-2">
-                    <Label htmlFor="edit-model-completionPrice">Completion $/1K</Label>
-                    <Input id="edit-model-completionPrice" name="completionPricePer1k" type="number" step="0.0001" defaultValue={model.completionPricePer1k} />
+                    <Label htmlFor="edit-model-completionPrice">Output $/1M</Label>
+                    <Input id="edit-model-completionPrice" name="completionPricePer1k" type="number" step="0.01" defaultValue={model.completionPricePer1k * 1000} />
+                  </div>
+                </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="edit-model-latency">Latency TTFT (ms)</Label>
+                    <Input id="edit-model-latency" name="latencyTtftMs" type="number" defaultValue={model.latencyTtftMs} />
+                  </div>
+                  <div className="flex items-end gap-4 pb-2">
+                    <label className="flex items-center gap-2 text-sm">
+                      <input type="checkbox" name="supportsStreaming" defaultChecked={model.supportsStreaming} />
+                      Streaming
+                    </label>
+                    <label className="flex items-center gap-2 text-sm">
+                      <input type="checkbox" name="supportsToolUse" defaultChecked={model.supportsToolUse} />
+                      Tool Use
+                    </label>
                   </div>
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="edit-model-latency">Latency TTFT (ms)</Label>
-                  <Input id="edit-model-latency" name="latencyTtftMs" type="number" defaultValue={model.latencyTtftMs} />
-                </div>
-                <div className="flex gap-4">
-                  <label className="flex items-center gap-2 text-sm">
-                    <input type="checkbox" name="supportsStreaming" defaultChecked={model.supportsStreaming} />
-                    Streaming
-                  </label>
-                  <label className="flex items-center gap-2 text-sm">
-                    <input type="checkbox" name="supportsToolUse" defaultChecked={model.supportsToolUse} />
-                    Tool Use
-                  </label>
+                  <Label htmlFor="edit-model-monthlyQuotaCost">Monthly Quota ($)</Label>
+                  <Input id="edit-model-monthlyQuotaCost" name="monthlyQuotaCost" type="number" step="0.01" defaultValue={model.monthlyQuotaCost ?? ""} placeholder="Leave blank for no limit" />
                 </div>
                 <DialogFooter>
                   <Button type="submit">Save Model</Button>

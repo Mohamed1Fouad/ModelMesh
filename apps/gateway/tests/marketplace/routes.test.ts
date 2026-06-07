@@ -12,7 +12,10 @@ vi.mock("@modelmesh/db", () => ({
     },
     provider: {
       findUnique: vi.fn(),
-      create: vi.fn(),
+      upsert: vi.fn(),
+    },
+    model: {
+      upsert: vi.fn(),
     },
   },
 }));
@@ -40,6 +43,9 @@ function buildFastify() {
     delete: (url: string, opts: any, handler?: Function) => {
       if (!handler) { handler = opts; opts = {}; }
       (routes["DELETE"] ??= []).push({ method: "DELETE", url, handler: handler as Function, preHandler: opts?.preHandler });
+    },
+    register: async (plugin: Function) => {
+      await plugin(fastify);
     },
     routes,
     hooks,
@@ -132,8 +138,8 @@ describe("registerMarketplaceRoutes", () => {
     vi.mocked(prisma.marketplacePreset.findUnique).mockResolvedValue({
       id: "pre-1", name: "Llama 3", providerName: "ollama", modelId: "llama3", contextWindow: 128000, capabilities: ["chat", "streaming"], pricingPrompt: 0, pricingCompletion: 0,
     } as any);
-    vi.mocked(prisma.provider.findUnique).mockResolvedValue(null);
-    vi.mocked(prisma.provider.create).mockResolvedValue({ id: "prov-1", models: [{ id: "mod-1" }] } as any);
+    vi.mocked(prisma.provider.upsert).mockResolvedValue({ id: "prov-1" } as any);
+    vi.mocked(prisma.model.upsert).mockResolvedValue({ id: "mod-1" } as any);
     vi.mocked(prisma.marketplacePreset.update).mockResolvedValue({} as any);
 
     const req = { params: { id: "pre-1" }, user: { id: "u1", role: "super_admin" }, headers: {}, query: {}, body: {} } as any;
@@ -141,23 +147,26 @@ describe("registerMarketplaceRoutes", () => {
     await route.handler(req, reply);
 
     expect(reply.getSent()[0].status).toBe(201);
-    expect(prisma.provider.create).toHaveBeenCalled();
+    expect(prisma.provider.upsert).toHaveBeenCalled();
     expect(prisma.marketplacePreset.update).toHaveBeenCalledWith({ where: { id: "pre-1" }, data: { downloads: { increment: 1 } } });
   });
 
-  it("returns 409 when provider already exists", async () => {
+  it("installs preset when provider already exists", async () => {
     const fastify = buildFastify();
     await registerMarketplaceRoutes(fastify as any);
     const route = fastify.routes.POST.find((r) => r.url === "/v1/marketplace/:id/install")!;
 
-    vi.mocked(prisma.marketplacePreset.findUnique).mockResolvedValue({ id: "pre-1", providerName: "ollama" } as any);
-    vi.mocked(prisma.provider.findUnique).mockResolvedValue({ id: "prov-1" } as any);
+    vi.mocked(prisma.marketplacePreset.findUnique).mockResolvedValue({ id: "pre-1", providerName: "ollama", modelId: "llama3", contextWindow: 128000, capabilities: ["chat"], pricingPrompt: 0, pricingCompletion: 0 } as any);
+    vi.mocked(prisma.provider.upsert).mockResolvedValue({ id: "prov-1" } as any);
+    vi.mocked(prisma.model.upsert).mockResolvedValue({ id: "mod-1" } as any);
+    vi.mocked(prisma.marketplacePreset.update).mockResolvedValue({} as any);
 
     const req = { params: { id: "pre-1" }, user: { id: "u1", role: "super_admin" }, headers: {}, query: {}, body: {} } as any;
     const reply = makeReply();
     await route.handler(req, reply);
 
-    expect(reply.getSent()[0].status).toBe(409);
+    expect(reply.getSent()[0].status).toBe(201);
+    expect(prisma.provider.upsert).toHaveBeenCalled();
   });
 
   it("returns 404 when installing nonexistent preset", async () => {

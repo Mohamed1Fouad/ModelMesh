@@ -35,6 +35,7 @@ export async function createProvider(data: {
   timeoutMs?: number;
   retries?: number;
   weight?: number;
+  monthlyQuotaCost?: number;
 }) {
   const provider = await prisma.provider.create({
     data: {
@@ -45,6 +46,7 @@ export async function createProvider(data: {
       timeoutMs: data.timeoutMs ?? 30000,
       retries: data.retries ?? 3,
       weight: data.weight ?? 1,
+      monthlyQuotaCost: data.monthlyQuotaCost,
     },
   });
   revalidatePath("/providers");
@@ -62,6 +64,7 @@ export async function updateProvider(
     timeoutMs?: number;
     retries?: number;
     weight?: number;
+    monthlyQuotaCost?: number | null;
   }
 ) {
   const provider = await prisma.provider.update({
@@ -83,6 +86,7 @@ export async function deleteProvider(id: string) {
 export async function createModel(data: {
   providerId: string;
   externalId: string;
+  openRouterId?: string;
   name: string;
   contextWindow: number;
   maxTokens?: number;
@@ -93,11 +97,13 @@ export async function createModel(data: {
   completionPricePer1k?: number;
   latencyTtftMs?: number;
   latencyThroughputTokensPerSec?: number;
+  monthlyQuotaCost?: number;
 }) {
   const model = await prisma.model.create({
     data: {
       providerId: data.providerId,
       externalId: data.externalId,
+      openRouterId: data.openRouterId,
       name: data.name,
       contextWindow: data.contextWindow,
       maxTokens: data.maxTokens,
@@ -108,6 +114,7 @@ export async function createModel(data: {
       completionPricePer1k: data.completionPricePer1k ?? 0,
       latencyTtftMs: data.latencyTtftMs ?? 500,
       latencyThroughputTokensPerSec: data.latencyThroughputTokensPerSec ?? 50,
+      monthlyQuotaCost: data.monthlyQuotaCost,
     },
   });
   revalidatePath("/providers");
@@ -120,6 +127,8 @@ export async function updateModel(
   data: {
     name?: string;
     enabled?: boolean;
+    externalId?: string;
+    openRouterId?: string | null;
     contextWindow?: number;
     maxTokens?: number;
     capabilities?: string[];
@@ -128,6 +137,7 @@ export async function updateModel(
     promptPricePer1k?: number;
     completionPricePer1k?: number;
     latencyTtftMs?: number;
+    monthlyQuotaCost?: number | null;
   }
 ) {
   const model = await prisma.model.update({

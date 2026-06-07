@@ -15,6 +15,7 @@ export interface AuthenticatedRequest extends FastifyRequest {
 
 const PERMISSIONS: Record<string, string[]> = {
   owner: ["*"],
+  api_key: ["*"],
   admin: [
     "provider:read", "provider:write",
     "rule:read", "rule:write",
@@ -69,6 +70,7 @@ export async function authMiddleware(
       email: keyRecord.name,
       name: keyRecord.name,
       role: "api_key",
+      teamRole: "api_key",
     };
     return;
   }
@@ -89,6 +91,7 @@ export async function authMiddleware(
         email: keyRecord.name,
         name: keyRecord.name,
         role: "api_key",
+        teamRole: "api_key",
       };
       return;
     }

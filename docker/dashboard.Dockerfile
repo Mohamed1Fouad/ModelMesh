@@ -34,6 +34,7 @@ RUN for pkg in packages/*/package.json; do \
       sed -i 's|"types": "\./src/index\.ts"|"types": "\./dist/index\.d\.ts"|g' "$pkg"; \
     done
 
+ENV GATEWAY_URL=http://gateway:3000
 RUN pnpm run build --filter=@modelmesh/dashboard
 
 FROM base AS runner

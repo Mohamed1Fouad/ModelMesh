@@ -26,6 +26,9 @@ vi.mock("@modelmesh/db", () => ({
     teamProvider: {
       upsert: vi.fn(),
     },
+    user: {
+      findUnique: vi.fn(),
+    },
     $transaction: vi.fn((ops) => Promise.all(ops)),
   },
 }));
@@ -58,6 +61,9 @@ function buildFastify() {
     delete: (url: string, opts: any, handler?: Function) => {
       if (!handler) { handler = opts; opts = {}; }
       (routes["DELETE"] ??= []).push({ method: "DELETE", url, handler: handler as Function, preHandler: opts?.preHandler });
+    },
+    register: async (plugin: Function) => {
+      await plugin(fastify);
     },
     routes,
     hooks,

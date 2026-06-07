@@ -10,14 +10,6 @@ const nextConfig = {
     };
     return config;
   },
-  async rewrites() {
-    return [
-      {
-        source: '/api/:path*',
-        destination: `${process.env.GATEWAY_URL ?? 'http://localhost:3000'}/v1/:path*`,
-      },
-    ];
-  },
 };
 
 module.exports = nextConfig;

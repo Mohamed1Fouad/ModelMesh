@@ -1,6 +1,7 @@
 {
   "$schema": "https://turbo.build/schema.json",
   "globalDependencies": [".env"],
+  "globalEnv": ["DATABASE_URL", "GATEWAY_URL", "CORS_ORIGIN", "OPENAI_API_KEY", "ANTHROPIC_API_KEY", "OLLAMA_BASE_URL"],
   "tasks": {
     "build": {
       "dependsOn": ["^build"],

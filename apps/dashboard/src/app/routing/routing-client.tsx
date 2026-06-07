@@ -47,10 +47,17 @@ const ACTION_TYPES = [
   { value: "reject", label: "Reject", fields: [{ name: "reason", label: "Reason", type: "text" }] },
 ];
 
-export function RoutingClient({ rules }: { rules: RoutingRule[] }) {
+export function RoutingClient({
+  rules,
+  models,
+}: {
+  rules: RoutingRule[];
+  models: { externalId: string; name: string; provider: { name: string } }[];
+}) {
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [conditionType, setConditionType] = useState("task_type");
   const [actionType, setActionType] = useState("route_to");
+  const [actionProvider, setActionProvider] = useState("openai");
 
   async function handleCreate(formData: FormData) {
     const condition: Record<string, unknown> = { type: conditionType };
@@ -213,7 +220,19 @@ export function RoutingClient({ rules }: { rules: RoutingRule[] }) {
                 {ACTION_TYPES.find((a) => a.value === actionType)?.fields.map((field) => (
                   <div key={field.name} className="space-y-2">
                     <Label htmlFor={`act_${field.name}`}>{field.label}</Label>
-                    {"options" in field ? (
+                    {field.name === "provider" && actionType === "route_to" ? (
+                      <select
+                        id={`act_${field.name}`}
+                        name={`act_${field.name}`}
+                        value={actionProvider}
+                        onChange={(e) => setActionProvider(e.target.value)}
+                        className="flex h-9 w-full rounded-md border border-border bg-background px-3 py-1 text-sm"
+                      >
+                        {field.options?.map((opt: string) => (
+                          <option key={opt} value={opt}>{opt}</option>
+                        ))}
+                      </select>
+                    ) : "options" in field ? (
                       <select
                         id={`act_${field.name}`}
                         name={`act_${field.name}`}
@@ -222,6 +241,21 @@ export function RoutingClient({ rules }: { rules: RoutingRule[] }) {
                         {field.options?.map((opt: string) => (
                           <option key={opt} value={opt}>{opt}</option>
                         ))}
+                      </select>
+                    ) : field.name === "model" && actionType === "route_to" ? (
+                      <select
+                        id={`act_${field.name}`}
+                        name={`act_${field.name}`}
+                        className="flex h-9 w-full rounded-md border border-border bg-background px-3 py-1 text-sm"
+                      >
+                        <option value="">Any model</option>
+                        {models
+                          .filter((m) => m.provider.name === actionProvider)
+                          .map((m) => (
+                            <option key={m.externalId} value={m.externalId}>
+                              {m.name}
+                            </option>
+                          ))}
                       </select>
                     ) : (
                       <Input id={`act_${field.name}`} name={`act_${field.name}`} type={field.type} />

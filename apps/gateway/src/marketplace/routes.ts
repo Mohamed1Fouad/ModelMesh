@@ -4,10 +4,11 @@ import { authMiddleware, requirePermission } from "../auth/middleware.js";
 import type { AuthenticatedRequest } from "../auth/middleware.js";
 
 export async function registerMarketplaceRoutes(fastify: FastifyInstance) {
-  fastify.addHook("onRequest", authMiddleware);
+  await fastify.register(async (scoped) => {
+    scoped.addHook("onRequest", authMiddleware);
 
   // List marketplace presets
-  fastify.get("/v1/marketplace", async (request: AuthenticatedRequest, reply: FastifyReply) => {
+  scoped.get("/v1/marketplace", async (request: AuthenticatedRequest, reply: FastifyReply) => {
     const query = request.query as Record<string, string>;
     const category = query.category;
     const search = query.search;
@@ -50,7 +51,7 @@ export async function registerMarketplaceRoutes(fastify: FastifyInstance) {
   });
 
   // Get single preset
-  fastify.get("/v1/marketplace/:id", async (_request, reply: FastifyReply) => {
+  scoped.get("/v1/marketplace/:id", async (_request, reply: FastifyReply) => {
     const { id } = _request.params as Record<string, string>;
     const preset = await prisma.marketplacePreset.findUnique({ where: { id } });
     if (!preset) return reply.status(404).send({ error: { message: "Preset not found", type: "not_found" } });
@@ -58,37 +59,37 @@ export async function registerMarketplaceRoutes(fastify: FastifyInstance) {
   });
 
   // Install preset (self-hosted: creates a local provider + model)
-  fastify.post("/v1/marketplace/:id/install", { preHandler: requirePermission("marketplace:write") }, async (request: AuthenticatedRequest, reply: FastifyReply) => {
+  scoped.post("/v1/marketplace/:id/install", { preHandler: requirePermission("marketplace:write") }, async (request: AuthenticatedRequest, reply: FastifyReply) => {
     const { id } = request.params as Record<string, string>;
     const preset = await prisma.marketplacePreset.findUnique({ where: { id } });
     if (!preset) return reply.status(404).send({ error: { message: "Preset not found", type: "not_found" } });
 
-    const existingProvider = await prisma.provider.findUnique({ where: { name: preset.providerName } });
-    if (existingProvider) {
-      return reply.status(409).send({ error: { message: `Provider ${preset.providerName} already exists`, type: "conflict" } });
-    }
-
-    const provider = await prisma.provider.create({
-      data: {
+    const provider = await prisma.provider.upsert({
+      where: { name: preset.providerName },
+      update: {},
+      create: {
         name: preset.providerName,
         displayName: preset.providerName,
         baseUrl: null,
         apiKey: null,
         enabled: true,
-        models: {
-          create: {
-            externalId: preset.modelId,
-            name: preset.name,
-            contextWindow: preset.contextWindow,
-            capabilities: preset.capabilities,
-            supportsStreaming: preset.capabilities.includes("streaming"),
-            supportsToolUse: preset.capabilities.includes("tool_use") || preset.capabilities.includes("function_calling"),
-            promptPricePer1k: preset.pricingPrompt,
-            completionPricePer1k: preset.pricingCompletion,
-          },
-        },
       },
-      include: { models: true },
+    });
+
+    const model = await prisma.model.upsert({
+      where: { providerId_externalId: { providerId: provider.id, externalId: preset.modelId } },
+      update: {},
+      create: {
+        providerId: provider.id,
+        externalId: preset.modelId,
+        name: preset.name,
+        contextWindow: preset.contextWindow,
+        capabilities: preset.capabilities,
+        supportsStreaming: preset.capabilities.includes("streaming"),
+        supportsToolUse: preset.capabilities.includes("tool_use") || preset.capabilities.includes("function_calling"),
+        promptPricePer1k: preset.pricingPrompt,
+        completionPricePer1k: preset.pricingCompletion,
+      },
     });
 
     await prisma.marketplacePreset.update({
@@ -98,13 +99,13 @@ export async function registerMarketplaceRoutes(fastify: FastifyInstance) {
 
     return reply.status(201).send({
       providerId: provider.id,
-      modelId: provider.models[0]?.id,
+      modelId: model.id,
       message: `Installed ${preset.name} as ${preset.providerName}/${preset.modelId}`,
     });
   });
 
   // Create marketplace preset (admin only)
-  fastify.post("/v1/marketplace", { preHandler: requirePermission("marketplace:write") }, async (request: AuthenticatedRequest, reply: FastifyReply) => {
+  scoped.post("/v1/marketplace", { preHandler: requirePermission("marketplace:write") }, async (request: AuthenticatedRequest, reply: FastifyReply) => {
     const body = request.body as Record<string, unknown>;
     const preset = await prisma.marketplacePreset.create({
       data: {
@@ -126,9 +127,10 @@ export async function registerMarketplaceRoutes(fastify: FastifyInstance) {
   });
 
   // Delete preset
-  fastify.delete("/v1/marketplace/:id", { preHandler: requirePermission("marketplace:write") }, async (request: AuthenticatedRequest, reply: FastifyReply) => {
+  scoped.delete("/v1/marketplace/:id", { preHandler: requirePermission("marketplace:write") }, async (request: AuthenticatedRequest, reply: FastifyReply) => {
     const { id } = request.params as Record<string, string>;
     await prisma.marketplacePreset.delete({ where: { id } });
     return reply.status(204).send();
+  });
   });
 }

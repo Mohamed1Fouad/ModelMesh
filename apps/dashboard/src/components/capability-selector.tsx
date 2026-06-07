@@ -1,6 +1,6 @@
 "use client";
 
-import { Badge } from "@/components/ui/badge";
+import { useRef } from "react";
 
 const CAPABILITY_GROUPS = [
   {
@@ -42,36 +42,40 @@ const CAPABILITY_GROUPS = [
   },
 ];
 
-const ALL_CAPABILITIES = CAPABILITY_GROUPS.flatMap((g) => g.items.map((i) => i.id));
-
 interface CapabilitySelectorProps {
   name: string;
   defaultValue?: string[];
 }
 
-export function CapabilitySelector({ name, defaultValue = [] }: CapabilitySelectorProps) {
+export function CapabilitySelector({ name, defaultValue }: CapabilitySelectorProps) {
+  const containerRef = useRef<HTMLDivElement>(null);
+  const allCapIds = CAPABILITY_GROUPS.flatMap((g) => g.items.map((i) => i.id));
+  const checkedSet = new Set(defaultValue ?? allCapIds);
+
+  const handleToggleAll = () => {
+    const container = containerRef.current;
+    if (!container) return;
+    const checkboxes = container.querySelectorAll<HTMLInputElement>("input[type='checkbox']");
+    const allChecked = Array.from(checkboxes).every((cb) => cb.checked);
+    checkboxes.forEach((cb) => {
+      cb.checked = !allChecked;
+    });
+  };
+
   return (
-    <div className="space-y-4">
+    <div ref={containerRef} className="space-y-4">
       <div className="flex items-center justify-between">
         <span className="text-sm font-medium">Capabilities</span>
         <button
           type="button"
           className="text-xs text-primary hover:underline"
-          onClick={(e) => {
-            const container = (e.target as HTMLElement).closest(".capability-selector");
-            if (!container) return;
-            const checkboxes = container.querySelectorAll<HTMLInputElement>("input[type='checkbox']");
-            const allChecked = Array.from(checkboxes).every((cb) => cb.checked);
-            checkboxes.forEach((cb) => {
-              cb.checked = !allChecked;
-            });
-          }}
+          onClick={handleToggleAll}
         >
           Toggle All
         </button>
       </div>
 
-      <div className="capability-selector grid grid-cols-2 gap-4">
+      <div className="grid grid-cols-2 gap-4">
         {CAPABILITY_GROUPS.map((group) => (
           <div key={group.label} className="space-y-2">
             <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
@@ -87,7 +91,7 @@ export function CapabilitySelector({ name, defaultValue = [] }: CapabilitySelect
                     type="checkbox"
                     name={name}
                     value={item.id}
-                    defaultChecked={defaultValue.includes(item.id)}
+                    defaultChecked={checkedSet.has(item.id)}
                     className="rounded border-input h-4 w-4"
                   />
                   <span>{item.label}</span>
@@ -96,15 +100,6 @@ export function CapabilitySelector({ name, defaultValue = [] }: CapabilitySelect
             </div>
           </div>
         ))}
-      </div>
-
-      <div className="flex flex-wrap gap-1">
-        {ALL_CAPABILITIES.map((cap) => (
-          <Badge key={cap} variant="outline" className="text-[10px]">
-            {cap}
-          </Badge>
-        ))}
-        <span className="text-[10px] text-muted-foreground ml-1">— all supported capabilities</span>
       </div>
     </div>
   );

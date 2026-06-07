@@ -58,6 +58,9 @@ function buildFastify() {
       if (!handler) { handler = opts; opts = {}; }
       (routes["POST"] ??= []).push({ method: "POST", url, handler: handler as Function, preHandler: opts?.preHandler });
     },
+    register: async (plugin: Function) => {
+      await plugin(fastify);
+    },
     routes,
     hooks,
   };
